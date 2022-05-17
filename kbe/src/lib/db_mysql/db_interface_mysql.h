@@ -53,7 +53,7 @@ class DBException;
 class DBInterfaceMysql : public DBInterface
 {
 public:
-	DBInterfaceMysql(const char* name, std::string characterSet, std::string collation);
+	DBInterfaceMysql(const char* name, std::string characterSet, std::string collation, std::string autoIncrementOffset, std::string autoIncrementIncrement);
 	virtual ~DBInterfaceMysql();
 
 	static bool initInterface(DBInterface* pdbi);
@@ -193,6 +193,9 @@ protected:
 
 	std::string characterSet_;
 	std::string collation_;
+
+	std::string autoIncrementOffset_;
+	std::string autoIncrementIncrement_;
 
 	static size_t sql_max_allowed_packet_;
 };

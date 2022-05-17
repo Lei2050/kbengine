@@ -985,6 +985,12 @@ bool ServerConfig::loadConfig(std::string fileName)
 					if (name == "default")
 						pDBInfo->isPure = false;
 
+					node = xml->enterNode(interfaceNode, "acrossDB");
+					if (node)
+						pDBInfo->acrossDB = xml->getValStr(node) == "true";
+					if (name == "default")	// 默认库不允许是跨服数据库
+						pDBInfo->acrossDB = false;
+
 					node = xml->enterNode(interfaceNode, "type");
 					if(node != NULL)
 						strncpy((char*)&pDBInfo->db_type, xml->getValStr(node).c_str(), MAX_NAME - 1);
@@ -1092,6 +1098,22 @@ bool ServerConfig::loadConfig(std::string fileName)
 					if (pDBInfo->db_unicodeString_collation.size() == 0)
 						pDBInfo->db_unicodeString_collation = "utf8_bin";
 	
+					node = xml->enterNode(interfaceNode, "auto_increment");
+					if (node != NULL)
+					{
+						TiXmlNode* childnode = xml->enterNode(node, "offset");
+						if (childnode)
+						{
+							pDBInfo->auto_increment_offset = xml->getValStr(childnode);
+						}
+
+						childnode = xml->enterNode(node, "increment");
+						if (childnode)
+						{
+							pDBInfo->auto_increment_increment = xml->getValStr(childnode);
+						}
+					}
+
 					if (pDBInfo == &dbinfo)
 					{
 						// 检查不能在不同的接口中使用相同的数据库与相同的表
@@ -1537,6 +1559,54 @@ bool ServerConfig::loadConfig(std::string fileName)
 		}
 	}
 
+	rootNode = xml->getRootNode("centermgr");
+	if (rootNode != NULL)
+	{
+		node = xml->enterNode(rootNode, "internalInterface");
+		if (node != NULL)
+			strncpy((char*)&_centerMgrInfo.internalInterface, xml->getValStr(node).c_str(), MAX_NAME - 1);
+
+		node = xml->enterNode(rootNode, "externalInterface");
+		if (node != NULL)
+			strncpy((char*)&_centerMgrInfo.externalInterface, xml->getValStr(node).c_str(), MAX_NAME - 1);
+
+		node = xml->enterNode(rootNode, "externalAddress");
+		if (node != NULL)
+			strncpy((char*)&_centerMgrInfo.externalAddress, xml->getValStr(node).c_str(), MAX_NAME - 1);
+
+		node = xml->enterNode(rootNode, "externalPorts_min");
+		if (node != NULL)
+			_centerMgrInfo.externalPorts_min = xml->getValInt(node);
+
+		node = xml->enterNode(rootNode, "externalPorts_max");
+		if (node != NULL)
+			_centerMgrInfo.externalPorts_max = xml->getValInt(node);
+		if (_centerMgrInfo.externalPorts_min < 0)
+			_centerMgrInfo.externalPorts_min = 0;
+		if (_centerMgrInfo.externalPorts_max < _centerMgrInfo.externalPorts_min)
+			_centerMgrInfo.externalPorts_max = _centerMgrInfo.externalPorts_min;
+
+		node = xml->enterNode(rootNode, "addresses");
+		if (node)
+		{
+			do
+			{
+				if (TiXmlNode::TINYXML_COMMENT == node->Type())
+					continue;
+
+				if (node->FirstChild() != NULL)
+				{
+					std::string c = node->FirstChild()->Value();
+					c = strutil::kbe_trim(c);
+					if (c.size() > 0)
+					{
+						_centerMgrInfo.connect_center_addresses.push_back(c);
+					}
+				}
+			} while ((node = node->NextSibling()));
+		}
+	}
+
 	if(email_service_config.size() > 0)
 	{
 		SmartPointer<XML> emailxml(new XML(Resmgr::getSingleton().matchRes(email_service_config).c_str()));
@@ -1942,6 +2012,37 @@ void ServerConfig::updateInfos(bool isPrint, COMPONENT_TYPE componentType, COMPO
 			infostr += (fmt::format("\tcomponentID : {}\n", info.componentID));
 		}
 	}
+	else if (componentType == CENTERMGR_TYPE)
+	{
+		ENGINE_COMPONENT_INFO& info = getCenterMgr();
+		info.internalAddr = const_cast<Network::Address*>(&internalAddr);
+		info.externalAddr = const_cast<Network::Address*>(&externalAddr);
+		info.componentID = componentID;
+
+		if (isPrint)
+		{
+			INFO_MSG("server-configs:\n");
+			INFO_MSG(fmt::format("\tinternalAddr : {}\n", internalAddr.c_str()));
+			INFO_MSG(fmt::format("\texternalAddr : {}\n", externalAddr.c_str()));
+			if (strlen(info.externalAddress) > 0)
+			{
+				INFO_MSG(fmt::format("\texternalCustomAddr : {}\n", info.externalAddress));
+			}
+
+			INFO_MSG(fmt::format("\tcomponentID : {}\n", info.componentID));
+
+			infostr += "server-configs:\n";
+			infostr += (fmt::format("\tinternalAddr : {}\n", internalAddr.c_str()));
+			infostr += (fmt::format("\texternalAddr : {}\n", externalAddr.c_str()));
+
+			if (strlen(info.externalAddress) > 0)
+			{
+				infostr += (fmt::format("\texternalCustomAddr : {}\n", info.externalAddress));
+			}
+
+			infostr += (fmt::format("\tcomponentID : {}\n", info.componentID));
+		}
+	}
 
 #if KBE_PLATFORM == PLATFORM_WIN32
 	if(infostr.size() > 0)
@@ -1950,6 +2051,26 @@ void ServerConfig::updateInfos(bool isPrint, COMPONENT_TYPE componentType, COMPO
 		printf("%s", infostr.c_str());
 	}
 #endif
+}
+
+//-------------------------------------------------------------------------------------
+std::string ServerConfig::getDBInterfaceNameByDBInfo(const char *ip, const char *dbName)
+{
+	ENGINE_COMPONENT_INFO &dbinfo = getDBMgr();
+
+	std::vector<DBInterfaceInfo>::iterator iter = dbinfo.dbInterfaceInfos.begin();
+	for (; iter != dbinfo.dbInterfaceInfos.end(); iter++)
+	{
+		if (strcmp(iter->db_ip, ip) == 0)
+		{
+			if(strcmp(iter->db_name, dbName) == 0)
+			{ 
+				return iter->name;
+			}
+		}
+	}
+
+	return "";
 }
 
 //-------------------------------------------------------------------------------------		

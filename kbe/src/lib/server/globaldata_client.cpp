@@ -3,6 +3,8 @@
 #include "components.h"
 #include "serverapp.h"
 #include "network/channel.h"
+#include "entitydef/entity_call.h"
+#include "entitydef/entitycall_cross_server.h"
 
 #include "../../server/dbmgr/dbmgr_interface.h"
 

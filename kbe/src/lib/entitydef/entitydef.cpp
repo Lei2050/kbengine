@@ -13,6 +13,7 @@
 #include "entitydef/volatileinfo.h"
 #include "entitydef/entity_call.h"
 #include "entitydef/entity_component_call.h"
+#include "entitydef/entitycall_cross_server.h"
 
 #ifndef CODE_INLINE
 #include "entitydef.inl"
@@ -2455,6 +2456,7 @@ bool EntityDef::installScript(PyObject* mod)
 
 	EntityCall::installScript(NULL);
 	EntityComponentCall::installScript(NULL);
+	EntityCallCrossServer::installScript(NULL);
 	FixedArray::installScript(NULL);
 	FixedDict::installScript(NULL);
 	VolatileInfo::installScript(NULL);
@@ -2472,6 +2474,7 @@ bool EntityDef::uninstallScript()
 		script::PyMemoryStream::uninstallScript();
 		EntityCall::uninstallScript();
 		EntityComponentCall::uninstallScript();
+		EntityCallCrossServer::uninstallScript();
 		FixedArray::uninstallScript();
 		FixedDict::uninstallScript();
 		VolatileInfo::uninstallScript();

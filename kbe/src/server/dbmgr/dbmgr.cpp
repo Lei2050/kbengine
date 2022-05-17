@@ -15,17 +15,21 @@
 #include "network/message_handler.h"
 #include "thread/threadpool.h"
 #include "server/components.h"
+#include "server/globaldata_server.h"
 #include "server/telnet_server.h"
 #include "db_interface/db_interface.h"
 #include "db_mysql/db_interface_mysql.h"
 #include "entitydef/scriptdef_module.h"
 #include "entitydef/py_entitydef.h"
+#include "entitydef/entity_call.h"
+#include "entitydef/entitycall_cross_server.h"
 
 #include "baseapp/baseapp_interface.h"
 #include "cellapp/cellapp_interface.h"
 #include "baseappmgr/baseappmgr_interface.h"
 #include "cellappmgr/cellappmgr_interface.h"
 #include "loginapp/loginapp_interface.h"
+#include "centermgr/centermgr_interface.h"
 
 namespace KBEngine{
 
@@ -44,6 +48,7 @@ Dbmgr::Dbmgr(Network::EventDispatcher& dispatcher,
 	pGlobalData_(NULL),
 	pBaseAppData_(NULL),
 	pCellAppData_(NULL),
+	pCenterData_(NULL),
 	bufferedDBTasksMaps_(),
 	numWrittenEntity_(0),
 	numRemovedEntity_(0),
@@ -54,9 +59,18 @@ Dbmgr::Dbmgr(Network::EventDispatcher& dispatcher,
 	pSyncAppDatasHandler_(NULL),
 	pUpdateDBServerLogHandler_(NULL),
 	pTelnetServer_(NULL),
-	loseBaseappts_()
+	loseBaseappts_(),
+	centermgrInfo_(NULL)
 {
 	KBEngine::Network::MessageHandlers::pMainMessageHandlers = &DbmgrInterface::messageHandlers;
+
+	// 初始化entitycall模块获取entity实体函数地址
+	EntityCall::setGetEntityFunc(std::tr1::bind(&Dbmgr::tryGetEntityByEntityCall, this,
+		std::tr1::placeholders::_1, std::tr1::placeholders::_2));
+
+	// 初始化entitycall模块获取channel函数地址
+	EntityCall::setFindChannelFunc(std::tr1::bind(&Dbmgr::findChannelByEntityCall, this,
+		std::tr1::placeholders::_1));
 }
 
 //-------------------------------------------------------------------------------------
@@ -70,6 +84,8 @@ Dbmgr::~Dbmgr()
 	{
 		SAFE_RELEASE((*iter));
 	}
+
+	SAFE_RELEASE(centermgrInfo_);
 }
 
 //-------------------------------------------------------------------------------------
@@ -160,6 +176,167 @@ void Dbmgr::onShutdownBegin()
 void Dbmgr::onShutdownEnd()
 {
 	PythonApp::onShutdownEnd();
+}
+
+//-------------------------------------------------------------------------------------
+void Dbmgr::onAllComponentFound()
+{
+	ServerApp::onAllComponentFound();
+
+	if (isCentermgrEnable())
+		findCentermgr();
+}
+
+//-------------------------------------------------------------------------------------
+bool Dbmgr::isCentermgrEnable()
+{
+	// TODO: 检查配置是否启用了 centermgr
+	return true;
+}
+
+//-------------------------------------------------------------------------------------
+bool Dbmgr::isCentermgrChannel(Network::Channel *channel)
+{
+	return centermgrInfo_ != NULL && centermgrInfo_->pChannel == channel;
+}
+
+//-------------------------------------------------------------------------------------
+void Dbmgr::findCentermgr()
+{
+	Network::EndPoint *ep = Network::EndPoint::createPoolObject(OBJECTPOOL_POINT);
+	ep->socket(SOCK_STREAM);
+	if (!ep->good())
+	{
+		ERROR_MSG("Components::findCentermgr: couldn't create a socket\n");
+		Network::EndPoint::reclaimPoolObject(ep);
+		return;
+	}
+
+	ep->setnonblocking(true);
+	u_int32_t ipint;
+	Network::Address::string2ip(g_serverConfig.getCenterMgr().externalAddress, ipint);
+	u_int16_t port = ntohs(g_serverConfig.getCenterMgr().externalPorts_min);
+	ep->addr(port, ipint);
+
+	struct timeval tv = { 0, 1000000 };
+	bool success = false;
+	for (int itry = 0; itry < 3; ++itry)
+	{
+		INFO_MSG(fmt::format("Components::findCentermgr: connect centermgr result({})\n", 99999999));
+		fd_set	frds, fwds;
+		FD_ZERO(&frds);
+		FD_ZERO(&fwds);
+		FD_SET((int)(*ep), &frds);
+		FD_SET((int)(*ep), &fwds);
+
+		if (ep->connect() == -1)
+		{
+			INFO_MSG(fmt::format("Components::findCentermgr: connect({}) centermgr result({})\n", ep->c_str(), 77777777));
+			if (select((*ep) + 1, &frds, &fwds, NULL, &tv) > 0)
+			{
+				INFO_MSG(fmt::format("Components::findCentermgr: connect centermgr result({}) \n", 1111111));
+				if (FD_ISSET((*ep), &frds) || FD_ISSET((*ep), &fwds))
+				{
+					ep->connect();
+					INFO_MSG(fmt::format("Components::findCentermgr: connect centermgr result({}) \n", 333333));
+					int error = kbe_lasterror();
+#if KBE_PLATFORM == PLATFORM_WIN32
+					if (error == WSAEISCONN || error == 0)
+#else
+					if (error == EISCONN)
+#endif
+					{
+						INFO_MSG(fmt::format("Components::findCentermgr: connect centermgr result({})\n", 555555));
+						success = true;
+						break;
+					}
+				}
+			}
+			else
+			{
+				ERROR_MSG(fmt::format("Components::findCentermgr: count({}) select wait failed.\n", itry));
+			}
+		}
+		else
+		{
+			INFO_MSG(fmt::format("Components::findCentermgr: connect centermgr result({})\n", 22222));
+			success = true;
+			break;
+		}
+	}
+	INFO_MSG(fmt::format("Components::findCentermgr: connect centermgr({}) result({}).\n", ep->c_str(), success));
+
+	if (success)
+	{
+		Network::Channel* pChannel = Network::Channel::createPoolObject(OBJECTPOOL_POINT);
+		success = pChannel->initialize(networkInterface_, ep, Network::Channel::INTERNAL);
+		if (!success)
+		{
+			ERROR_MSG(fmt::format("Components::findCentermgr: channel initialize({}) is failed!\n",
+				pChannel->c_str()));
+			return;
+		}
+
+		if (!networkInterface_.registerChannel(pChannel))
+		{
+			ERROR_MSG(fmt::format("Components::findCentermgr: registerChannel channel({}) is failed!\n",
+				pChannel->c_str()));
+
+			pChannel->destroy();
+			Network::Channel::reclaimPoolObject(pChannel);
+		}
+		else
+		{
+			Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
+			(*pBundle).newMessage(CentermgrInterface::onAppRegister);
+			CentermgrInterface::onAppRegisterArgs7::staticAddToBundle((*pBundle), componentType_, componentID_,
+				networkInterface_.intaddr().ip, networkInterface_.intaddr().port,
+				networkInterface_.extaddr().ip, networkInterface_.extaddr().port, g_kbeSrvConfig.getConfig().externalAddress);
+			pChannel->send(pBundle);
+
+			centermgrInfo_ = new Components::ComponentInfos;
+			centermgrInfo_->componentType = CENTERMGR_TYPE;
+			centermgrInfo_->pChannel = pChannel;
+
+			INFO_MSG(fmt::format("Components::findCentermgr: register  to centermgr({}) success.\n", ep->c_str()));
+		}
+	}
+	else
+	{
+		ERROR_MSG(fmt::format("Components::findCentermgr: connect({}) is failed! {}.\n",
+			ep->addr().c_str(), kbe_strerror()));
+
+		Network::EndPoint::reclaimPoolObject(ep);
+		return;
+	}
+}
+
+//-------------------------------------------------------------------------------------
+void Dbmgr::onComponentActiveTickTimeout()
+{
+	if (centermgrInfo_ != NULL && centermgrInfo_->pChannel != NULL)
+	{
+		Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
+		pBundle->newMessage(CentermgrInterface::onAppActiveTick);
+		(*pBundle) << g_componentType;
+		(*pBundle) << g_componentID;
+		centermgrInfo_->pChannel->send(pBundle);
+		INFO_MSG(fmt::format("Dbmgr::onComponentActiveTickTimeout: CentermgrInterface tick at time {}\n", timestamp()));
+	}
+}
+
+//-------------------------------------------------------------------------------------
+void Dbmgr::onAppActiveTick(Network::Channel* pChannel, COMPONENT_TYPE componentType, COMPONENT_ID componentID)
+{
+	// TODO: 需要验证centermgr的身份
+	if (componentType == CENTERMGR_TYPE && centermgrInfo_ != NULL && centermgrInfo_->pChannel != NULL)
+	{
+		INFO_MSG(fmt::format("Dbmgr::onAppActiveTick: app({}:{}) tick at time {}\n", COMPONENT_NAME_EX(componentType), pChannel->c_str(), timestamp()));
+		centermgrInfo_->pChannel->updateLastReceivedTime();
+		return;
+	}
+
+	ServerApp::onAppActiveTick(pChannel, componentType, componentID);
 }
 
 //-------------------------------------------------------------------------------------
@@ -271,6 +448,9 @@ bool Dbmgr::inInitialize()
 	if (!PythonApp::inInitialize())
 		return false;
 
+	EntityCall::installScript(NULL);
+	EntityCallCrossServer::installScript(NULL);
+
 	std::vector<PyTypeObject*>	scriptBaseTypes;
 	if(!EntityDef::initialize(scriptBaseTypes, componentType_)){
 		return false;
@@ -295,10 +475,13 @@ bool Dbmgr::initializeEnd()
 	pGlobalData_ = new GlobalDataServer(GlobalDataServer::GLOBAL_DATA);
 	pBaseAppData_ = new GlobalDataServer(GlobalDataServer::BASEAPP_DATA);
 	pCellAppData_ = new GlobalDataServer(GlobalDataServer::CELLAPP_DATA);
+	pCenterData_ = new GlobalDataServer(GlobalDataServer::CENTER_DATA);
 	pGlobalData_->addConcernComponentType(CELLAPP_TYPE);
 	pGlobalData_->addConcernComponentType(BASEAPP_TYPE);
 	pBaseAppData_->addConcernComponentType(BASEAPP_TYPE);
 	pCellAppData_->addConcernComponentType(CELLAPP_TYPE);
+	pCenterData_->addConcernComponentType(CELLAPP_TYPE);
+	pCenterData_->addConcernComponentType(BASEAPP_TYPE);
 
 	INFO_MSG(fmt::format("Dbmgr::initializeEnd: digest({})\n", 
 		EntityDef::md5().getDigestStr()));
@@ -477,12 +660,16 @@ void Dbmgr::finalise()
 	SAFE_RELEASE(pGlobalData_);
 	SAFE_RELEASE(pBaseAppData_);
 	SAFE_RELEASE(pCellAppData_);
+	SAFE_RELEASE(pCenterData_);
 
 	if (pTelnetServer_)
 	{
 		pTelnetServer_->stop();
 		SAFE_RELEASE(pTelnetServer_);
 	}
+
+	EntityCall::uninstallScript();
+	EntityCallCrossServer::uninstallScript();
 
 	DBUtil::finalise();
 	PythonApp::finalise();
@@ -516,6 +703,199 @@ void Dbmgr::onReqAllocEntityID(Network::Channel* pChannel, COMPONENT_ORDER compo
 	(*pBundle) << idRange.first;
 	(*pBundle) << idRange.second;
 	pChannel->send(pBundle);
+}
+
+//-------------------------------------------------------------------------------------
+void Dbmgr::onRegisterCentermgr(Network::Channel * pChannel, COMPONENT_ORDER centerID)
+{
+	ServerApp::onRegisterCentermgr(pChannel, centerID);
+
+	// 通知所有 baseapp 和 cellapp
+	Components::COMPONENTS& componets = Components::getSingleton().getComponents(BASEAPP_TYPE);
+	Components::COMPONENTS::iterator iter = componets.begin();
+	for (; iter != componets.end(); iter++)
+	{
+		Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
+		pBundle->newMessage(BaseappInterface::onRegisterCentermgr);
+		(*pBundle) << centerID;
+		iter->pChannel->send(pBundle);
+	}
+
+	componets = Components::getSingleton().getComponents(CELLAPP_TYPE);
+	iter = componets.begin();
+	for (; iter != componets.end(); iter++)
+	{
+		Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
+		pBundle->newMessage(CellappInterface::onRegisterCentermgr);
+		(*pBundle) << centerID;
+		iter->pChannel->send(pBundle);
+	}
+}
+
+//-------------------------------------------------------------------------------------
+void Dbmgr::requestEntityCallCrossServer(Network::Channel * pChannel, KBEngine::MemoryStream & s)
+{
+	if (pChannel->isExternal())
+		return;
+
+	if (!centermgrInfo_)
+	{
+		ERROR_MSG("Dbmgr::requestEntityCallCrossServer: cannot find CenterMgr, may be it was disconnected.");
+		return;
+	}
+
+	Network::Bundle* bundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
+	bundle->newMessage(CentermgrInterface::onEntityCallCrossServer);
+	bundle->append(s);
+	centermgrInfo_->pChannel->send(bundle);
+
+	s.done();
+}
+
+void Dbmgr::onEntityCallCrossServer(Network::Channel * pChannel, KBEngine::MemoryStream & s)
+{
+	// 如果做如下判断，需要明确CenterMgr也是内部组件
+	//if (pChannel->isExternal())
+	//	return;
+
+	COMPONENT_ID cid;
+	s >> cid;
+
+	Components::ComponentInfos* cinfos = Components::getSingleton().findComponent(cid);
+	if (cinfos != NULL)
+	{
+		Network::Bundle* bundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
+		if (cinfos->componentType == BASEAPP_TYPE)
+		{
+			bundle->newMessage(BaseappInterface::onEntityCall);
+		}
+		else
+		{
+			bundle->newMessage(CellappInterface::onEntityCall);
+		}
+		bundle->append(s);
+
+		if (cinfos->pChannel && !cinfos->pChannel->isDestroyed())
+		{
+			cinfos->pChannel->send(bundle);
+		}
+		else
+		{
+			ERROR_MSG(fmt::format("Dbmgr::onEntityCallCrossServer: invalid channel for component({})!\n", cid));
+		}
+	}
+	else
+	{
+		ERROR_MSG(fmt::format("EntityCallAbstract::newCall: not found component({})!\n", cid));
+	}
+
+	s.done();
+}
+
+//-------------------------------------------------------------------------------------
+void Dbmgr::requestAcrossServer(Network::Channel *pChannel, KBEngine::MemoryStream& s)
+{
+	DEBUG_MSG("Dbmgr::requestAcrossServer->>>");
+	if (pChannel->isExternal())
+		return;
+
+	if (!centermgrInfo_)
+	{
+		ERROR_MSG("Dbmgr::requestAcrossServer: cannot find CenterMgr, may be it was disconnected.");
+	}
+	else
+	{
+		Network::Bundle* bundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
+		bundle->newMessage(CentermgrInterface::requestAcrossServer);
+		bundle->append(s);
+		centermgrInfo_->pChannel->send(bundle);
+	}
+
+	s.done();
+}
+
+//-------------------------------------------------------------------------------------
+void Dbmgr::receiveAcrossServerRequest(Network::Channel * pChannel, KBEngine::MemoryStream & s)
+{
+	DEBUG_MSG("Dbmgr::receiveAcrossServerRequest-->>>");
+	if (!centermgrInfo_ || pChannel != centermgrInfo_->pChannel)
+	{
+		ERROR_MSG(fmt::format("Dbmgr::receiveAcrossServerRequest: from unknow centermgr:{}", pChannel->addr().c_str()));
+	}
+	else
+	{
+		COMPONENT_ID cid;
+		s >> cid;
+
+		Components::ComponentInfos* cinfos = Components::getSingleton().findComponent(cid);
+		if (cinfos != NULL)
+		{
+			Network::Bundle *bundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
+			bundle->newMessage(BaseappInterface::receiveAcrossServerRequest);
+			bundle->append(s);
+			cinfos->pChannel->send(bundle);
+		}
+		else
+		{
+			ERROR_MSG(fmt::format("Dbmgr::receiveAcrossServerRequest: cannot find component: {}", cid));
+			// TODO: 跨服失败回调
+		}
+	}
+
+	s.done();
+}
+
+//-------------------------------------------------------------------------------------
+void Dbmgr::requestAcrossServerSuccess(Network::Channel * pChannel, KBEngine::MemoryStream & s)
+{
+	DEBUG_MSG("Dbmgr::requestAcrossServerSuccess-->>>");
+	if (pChannel->isExternal())
+		return;
+
+	if (!centermgrInfo_)
+	{
+		ERROR_MSG("Dbmgr::requestAcrossServerSuccess: cannot find CenterMgr, may be it was disconnected.");
+	}
+	else
+	{
+		Network::Bundle* bundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
+		bundle->newMessage(CentermgrInterface::requestAcrossServerSuccess);
+		bundle->append(s);
+		centermgrInfo_->pChannel->send(bundle);
+	}
+
+	s.done();
+}
+
+//-------------------------------------------------------------------------------------
+void Dbmgr::receiveAcrossServerSuccess(Network::Channel * pChannel, KBEngine::MemoryStream & s)
+{
+	DEBUG_MSG("Dbmgr::receiveAcrossServerSuccess-->>>");
+	if (!centermgrInfo_ || pChannel != centermgrInfo_->pChannel)
+	{
+		ERROR_MSG(fmt::format("Dbmgr::receiveAcrossServerRequest: from unknow centermgr:{}", pChannel->addr().c_str()));
+	}
+	else
+	{
+		COMPONENT_ID cid;
+		s >> cid;
+
+		Components::ComponentInfos* cinfos = Components::getSingleton().findComponent(cid);
+		if (cinfos != NULL)
+		{
+			Network::Bundle *bundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
+			bundle->newMessage(BaseappInterface::receiveAcrossServerSuccess);
+			bundle->append(s);
+			cinfos->pChannel->send(bundle);
+		}
+		else
+		{
+			ERROR_MSG(fmt::format("Dbmgr::receiveAcrossServerRequest: cannot find component: {}", cid));
+			// TODO: 跨服失败回调
+		}
+	}
+
+	s.done();
 }
 
 //-------------------------------------------------------------------------------------
@@ -620,11 +1000,13 @@ void Dbmgr::onGlobalDataClientLogon(Network::Channel* pChannel, COMPONENT_TYPE c
 	{
 		pBaseAppData_->onGlobalDataClientLogon(pChannel, componentType);
 		pGlobalData_->onGlobalDataClientLogon(pChannel, componentType);
+		pCenterData_->onGlobalDataClientLogon(pChannel, componentType);
 	}
 	else if(CELLAPP_TYPE == componentType)
 	{
 		pGlobalData_->onGlobalDataClientLogon(pChannel, componentType);
 		pCellAppData_->onGlobalDataClientLogon(pChannel, componentType);
+		pCenterData_->onGlobalDataClientLogon(pChannel, componentType);
 	}
 	else
 	{
@@ -673,10 +1055,82 @@ void Dbmgr::onBroadcastGlobalDataChanged(Network::Channel* pChannel, KBEngine::M
 		else
 			pCellAppData_->write(pChannel, componentType, key, value);
 		break;
+	case GlobalDataServer::CENTER_DATA:
+		if (isDelete)
+			pCenterData_->del(pChannel, componentType, key);
+		else
+			pCenterData_->write(pChannel, componentType, key, value);
+
+		// 除了本服广播，还需通过中枢服务器广播
+		if (centermgrInfo_)
+		{
+			Network::Bundle *centerDataBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
+			(*centerDataBundle).newMessage(CentermgrInterface::onBroadcastCenterDataChanged);
+
+			(*centerDataBundle).append(s);
+
+			(*centerDataBundle) << dataType;
+			(*centerDataBundle) << isDelete;
+			ArraySize len = key.length();
+			(*centerDataBundle) << len;
+			(*centerDataBundle).assign(key.data(), len);
+
+			if (!isDelete)
+			{
+				// 检查如果是EntityCall，需要重新封装成 EntityCallCrossServer
+				PyObject * pyValue = script::Pickler::unpickle(value);
+				if (strcmp(pyValue->ob_type->tp_name, "EntityCall") == 0)
+				{
+					EntityCall* entitycall = static_cast<EntityCall *>(pyValue);
+					//const Network::Address *addr = &(entitycall->getChannel()->addr());
+					pyValue = static_cast<PyObject *>(new EntityCallCrossServer(g_centerID, entitycall));
+					value = script::Pickler::pickle(pyValue, 0);
+					delete pyValue;
+				}
+
+				len = value.length();
+				(*centerDataBundle) << len;
+				(*centerDataBundle).assign(value.data(), len);
+			}
+
+			(*centerDataBundle) << componentType;
+
+			centermgrInfo_->pChannel->send(centerDataBundle);
+		}
+		else
+		{
+			WARNING_MSG("Dbmgr::onBroadcastGlobalDataChanged: centermgr is not enable.");
+		}
+
+		break;
 	default:
 		KBE_ASSERT(false && "dataType error!\n");
 		break;
 	};
+}
+
+//-------------------------------------------------------------------------------------
+void Dbmgr::onBroadcastCenterDataChanged(Network::Channel* pChannel, KBEngine::MemoryStream& s)
+{
+	std::string key, value;
+	bool isDelete;
+	COMPONENT_TYPE componentType;
+
+	s >> isDelete;
+
+	s.readBlob(key);
+
+	if (!isDelete)
+	{
+		s.readBlob(value);
+	}
+
+	s >> componentType;
+
+	if (isDelete)
+		pCenterData_->del(pChannel, componentType, key);
+	else
+		pCenterData_->write(pChannel, componentType, key, value);
 }
 
 //-------------------------------------------------------------------------------------
@@ -730,6 +1184,7 @@ void Dbmgr::onLoginAccountCBBFromInterfaces(Network::Channel* pChannel, KBEngine
 void Dbmgr::queryAccount(Network::Channel* pChannel, 
 						 std::string& accountName, 
 						 std::string& password,
+						 std::string& dbInterfaceName,
 						 bool needCheckPassword,
 						 COMPONENT_ID componentID,
 						 ENTITY_ID entityID,
@@ -743,8 +1198,16 @@ void Dbmgr::queryAccount(Network::Channel* pChannel,
 		return;
 	}
 
-	Buffered_DBTasks* pBuffered_DBTasks = 
-		findBufferedDBTask(Dbmgr::getSingleton().selectAccountDBInterfaceName(accountName));
+	Buffered_DBTasks* pBuffered_DBTasks;
+	if (dbInterfaceName.size() > 0)
+	{
+		pBuffered_DBTasks =	findBufferedDBTask(dbInterfaceName);
+	}
+	else
+	{
+		pBuffered_DBTasks =
+			findBufferedDBTask(Dbmgr::getSingleton().selectAccountDBInterfaceName(accountName));
+	}
 
 	if (!pBuffered_DBTasks)
 	{
@@ -1281,6 +1744,40 @@ void Dbmgr::onChannelDeregister(Network::Channel * pChannel)
 	}
 	
 	ServerApp::onChannelDeregister(pChannel);
+
+	if (isCentermgrChannel(pChannel))
+	{
+		INFO_MSG(fmt::format("Dbmgr::onChannelDeregister: {} :centermgr({}) Abnormal exit(reason={})! Channel(timestamp={}, lastReceivedTime={})\n",
+			COMPONENT_NAME_EX(CENTERMGR_TYPE), pChannel->c_str(), pChannel->condemnReason(), timestamp(), pChannel->lastReceivedTime()));
+
+		SAFE_RELEASE(centermgrInfo_);
+	}
+}
+
+//-------------------------------------------------------------------------------------
+PyObject* Dbmgr::tryGetEntityByEntityCall(COMPONENT_ID componentID, ENTITY_ID eid)
+{
+	return NULL;
+}
+
+//-------------------------------------------------------------------------------------
+Network::Channel* Dbmgr::findChannelByEntityCall(EntityCall& entitycall)
+{
+	// 如果组件ID大于0则查找组件
+	if (entitycall.componentID() > 0)
+	{
+		Components::ComponentInfos* cinfos =
+			Components::getSingleton().findComponent(entitycall.componentID());
+
+		if (cinfos != NULL && cinfos->pChannel != NULL)
+			return cinfos->pChannel;
+	}
+	else
+	{
+		return Components::getSingleton().pNetworkInterface()->findChannel(entitycall.addr());
+	}
+
+	return NULL;
 }
 
 //-------------------------------------------------------------------------------------

@@ -65,6 +65,9 @@ const COMPONENT_TYPE ENTITYCALL_COMPONENT_TYPE_MAPPING[] =
 	CELLAPP_TYPE,
 	CELLAPP_TYPE,
 	BASEAPP_TYPE,
+	CELLAPP_TYPE,
+	BASEAPP_TYPE,
+	CLIENT_TYPE,
 };
 
 /** 属性的lod广播级别范围的定义 */
@@ -152,7 +155,9 @@ const char ENTITY_LIMITED_PROPERTYS[][34] =
 	"otherClients",
 	"topSpeed",
 	"topSpeedY",
-	"interface"
+	"interface",
+	"isAcrossServer",
+	"dbInterfaceName",
 	"",
 };
 

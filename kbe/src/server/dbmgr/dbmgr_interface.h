@@ -58,8 +58,32 @@ NETWORK_INTERFACE_DECLARE_BEGIN(DbmgrInterface)
 								COMPONENT_TYPE,						componentType,
 								COMPONENT_ID,						componentID)
 
+	// dbmgr 注册到 centermgr 成功
+	DBMGR_MESSAGE_DECLARE_ARGS1(onRegisterCentermgr, NETWORK_FIXED_MESSAGE, COMPONENT_ORDER, centerID)
+
+	// 收到跨服call请求, 由某个app上的EntityCallCrossServer发起
+	DBMGR_MESSAGE_DECLARE_STREAM(requestEntityCallCrossServer, NETWORK_VARIABLE_MESSAGE)
+
+	// 收到跨服call请求, 由某个app上的entityCallCrossServer发起,调用到本服某个app
+	DBMGR_MESSAGE_DECLARE_STREAM(onEntityCallCrossServer, NETWORK_VARIABLE_MESSAGE)
+
+	// 收到跨服登录请求
+	DBMGR_MESSAGE_DECLARE_STREAM(requestAcrossServer, NETWORK_VARIABLE_MESSAGE)
+
+	// 收到跨服登录请求
+	DBMGR_MESSAGE_DECLARE_STREAM(receiveAcrossServerRequest, NETWORK_VARIABLE_MESSAGE)
+
+	// 跨服登录请求成功
+	DBMGR_MESSAGE_DECLARE_STREAM(requestAcrossServerSuccess, NETWORK_VARIABLE_MESSAGE)
+
+	// 收到跨服登录请求成功的通知
+	DBMGR_MESSAGE_DECLARE_STREAM(receiveAcrossServerSuccess, NETWORK_VARIABLE_MESSAGE)
+
 	// global数据改变
 	DBMGR_MESSAGE_DECLARE_STREAM(onBroadcastGlobalDataChanged,		NETWORK_VARIABLE_MESSAGE)
+
+	// KBEngine.centerData数据改变
+	DBMGR_MESSAGE_DECLARE_STREAM(onBroadcastCenterDataChanged,		NETWORK_VARIABLE_MESSAGE)
 
 	// 某个app向本app告知处于活动状态。
 	DBMGR_MESSAGE_DECLARE_ARGS2(onAppActiveTick,					NETWORK_FIXED_MESSAGE,
@@ -75,9 +99,10 @@ NETWORK_INTERFACE_DECLARE_BEGIN(DbmgrInterface)
 	DBMGR_MESSAGE_DECLARE_STREAM(onLoginAccountCBBFromInterfaces,	NETWORK_VARIABLE_MESSAGE)
 
 	// baseapp查询账号信息。
-	DBMGR_MESSAGE_DECLARE_ARGS8(queryAccount,						NETWORK_VARIABLE_MESSAGE,
+	DBMGR_MESSAGE_DECLARE_ARGS9(queryAccount,						NETWORK_VARIABLE_MESSAGE,
 									std::string,					accountName,
 									std::string,					password,
+									std::string,					dbInterfaceName,
 									bool,							needCheckPassword,
 									COMPONENT_ID,					componentID,
 									ENTITY_ID,						entityID,

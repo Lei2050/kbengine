@@ -87,12 +87,14 @@ enum COMPONENT_TYPE
 	WATCHER_TYPE			= 12,
 	INTERFACES_TYPE			= 13,
 	TOOL_TYPE				= 14,
-	COMPONENT_END_TYPE		= 15,
+	CENTERMGR_TYPE			= 15,
+	COMPONENT_END_TYPE		= 16,
 };
 
 /** 当前服务器组件类别和ID */
 extern COMPONENT_TYPE g_componentType;
 extern COMPONENT_ID g_componentID;
+extern COMPONENT_ORDER g_centerID;
 
 /** 定义服务器各组件名称 */
 const char COMPONENT_NAME[][255] = {
@@ -111,6 +113,7 @@ const char COMPONENT_NAME[][255] = {
 	"watcher",
 	"interfaces",
 	"tool",
+	"centermgr",
 };
 
 const char COMPONENT_NAME_1[][255] = {
@@ -129,6 +132,7 @@ const char COMPONENT_NAME_1[][255] = {
 	"watcher   ",
 	"interfaces",
 	"tool      ",
+	"centermgr ",
 };
 
 const char COMPONENT_NAME_2[][255] = {
@@ -147,6 +151,7 @@ const char COMPONENT_NAME_2[][255] = {
 	"   watcher",
 	"interfaces",
 	"      tool",
+	" centermgr",
 };
 
 inline const char* COMPONENT_NAME_EX(COMPONENT_TYPE CTYPE)
@@ -289,6 +294,9 @@ enum ENTITYCALL_TYPE
 	ENTITYCALL_TYPE_BASE_VIA_CELL = 4,
 	ENTITYCALL_TYPE_CLIENT_VIA_CELL = 5,
 	ENTITYCALL_TYPE_CLIENT_VIA_BASE = 6,
+	ENTITYCALL_TYPE_CROSS_SERVER_CELL = 7,
+	ENTITYCALL_TYPE_CROSS_SERVER_BASE = 8,
+	ENTITYCALL_TYPE_CROSS_SERVER_CLIENT = 9,
 };
 
 /** 通过entityCall的类别获得该entity对应的组件类型 */
@@ -318,7 +326,7 @@ inline COMPONENT_TYPE entityCallType2ComponentType(ENTITYCALL_TYPE type)
 };
 
 /** entityCall的类别对换为字符串名称 严格和ENTITYCALL_TYPE索引匹配 */
-const char ENTITYCALL_TYPE_TO_NAME_TABLE[][8] =
+const char ENTITYCALL_TYPE_TO_NAME_TABLE[][11] =
 {
 	"cell",
 	"base",
@@ -326,6 +334,9 @@ const char ENTITYCALL_TYPE_TO_NAME_TABLE[][8] =
 	"cell",
 	"base",
 	"client",
+	"client",
+	"cell",
+	"base",
 	"client",
 };
 
@@ -339,6 +350,9 @@ const char ENTITYCALL_TYPE_TO_NAME_TABLE_EX[][14] =
 	"baseViaCell",
 	"clientViaCell",
 	"clientViaBase",
+	"cell",
+	"base",
+	"client",
 };
 
 /*

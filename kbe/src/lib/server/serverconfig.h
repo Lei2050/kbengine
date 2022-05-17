@@ -99,6 +99,7 @@ struct DBInterfaceInfo
 
 	int index;
 	bool isPure;											// 是否为纯净库（没有引擎创建的实体表）
+	bool acrossDB;											// 是否跨服数据库
 	char name[MAX_BUF];										// 数据库的接口名称
 	char db_type[MAX_BUF];									// 数据库的类别
 	uint32 db_port;											// 数据库的端口
@@ -111,6 +112,8 @@ struct DBInterfaceInfo
 	char db_autoIncrementInit[MAX_BUF];							// 自增索引起始
 	std::string db_unicodeString_characterSet;				// 设置数据库字符集
 	std::string db_unicodeString_collation;
+	std::string auto_increment_offset;						// 自增长字段偏移值
+	std::string auto_increment_increment;					// 自增长字段增长量
 };
 
 // 引擎组件信息结构体
@@ -141,6 +144,8 @@ typedef struct EngineComponentInfo
 
 	std::vector< std::string > machine_addresses;			// 配置中给出的所有的machine的地址
 	
+	std::vector< std::string > connect_center_addresses;	// 配置给出的所有参与跨服对接的组件地址
+
 	char entryScriptFile[MAX_NAME];							// 组件的入口脚本文件
 	char dbAccountEntityScriptType[MAX_NAME];				// 数据库帐号脚本类别
 	float defaultViewRadius;								// 配置在cellapp节点中的player的view半径大小
@@ -249,6 +254,7 @@ public:
 	INLINE ENGINE_COMPONENT_INFO& getDBMgr(void);
 	INLINE ENGINE_COMPONENT_INFO& getLoginApp(void);
 	INLINE ENGINE_COMPONENT_INFO& getCellAppMgr(void);
+	INLINE ENGINE_COMPONENT_INFO& getCenterMgr(void);
 	INLINE ENGINE_COMPONENT_INFO& getBaseAppMgr(void);
 	INLINE ENGINE_COMPONENT_INFO& getKBMachine(void);
 	INLINE ENGINE_COMPONENT_INFO& getBots(void);
@@ -286,6 +292,10 @@ public:
 	INLINE DBInterfaceInfo* dbInterface(const std::string& name);
 	INLINE int dbInterfaceName2dbInterfaceIndex(const std::string& dbInterfaceName);
 	INLINE const char* dbInterfaceIndex2dbInterfaceName(size_t dbInterfaceIndex);
+	INLINE bool IsAcrossDB(size_t dbInterfaceIndex);
+
+	INLINE bool getDBInfoByInterfaceName(const char *interfaceName, std::string &addr, std::string &dbName);
+	std::string getDBInterfaceNameByDBInfo(const char *ip, const char *dbName);
 
 private:
 	void _updateEmailInfos();
@@ -296,6 +306,7 @@ private:
 	ENGINE_COMPONENT_INFO _dbmgrInfo;
 	ENGINE_COMPONENT_INFO _loginAppInfo;
 	ENGINE_COMPONENT_INFO _cellAppMgrInfo;
+	ENGINE_COMPONENT_INFO _centerMgrInfo;
 	ENGINE_COMPONENT_INFO _baseAppMgrInfo;
 	ENGINE_COMPONENT_INFO _kbMachineInfo;
 	ENGINE_COMPONENT_INFO _botsInfo;

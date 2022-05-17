@@ -47,6 +47,23 @@ atIdx_(ENTITYCALLS::size_type(-1))
 	script::PyGC::incTracing("EntityCall");
 }
 
+EntityCall::EntityCall(PyTypeObject * scriptType, ScriptDefModule * pScriptModule, 
+	const Network::Address * pAddr, COMPONENT_ID componentID, ENTITY_ID eid, ENTITYCALL_TYPE type)
+	: EntityCallAbstract(scriptType,
+		pAddr,
+		componentID,
+		eid, pScriptModule->getUType(),
+		type),
+	scriptModuleName_(pScriptModule->getName()),
+	pScriptModule_(pScriptModule),
+	atIdx_(ENTITYCALLS::size_type(-1))
+{
+	atIdx_ = EntityCall::entityCalls.size();
+	EntityCall::entityCalls.push_back(this);
+
+	script::PyGC::incTracing("EntityCall");
+}
+
 //-------------------------------------------------------------------------------------
 EntityCall::~EntityCall()
 {
@@ -195,7 +212,10 @@ void EntityCall::c_str(char* s, size_t size)
 		(type_ == ENTITYCALL_TYPE_BASE_VIA_CELL)		? "BaseViaCell" :
 		(type_ == ENTITYCALL_TYPE_CLIENT_VIA_CELL)		? "ClientViaCell" :
 		(type_ == ENTITYCALL_TYPE_CELL_VIA_BASE)		? "CellViaBase" :
-		(type_ == ENTITYCALL_TYPE_CLIENT_VIA_BASE)		? "ClientViaBase" : "???";
+		(type_ == ENTITYCALL_TYPE_CLIENT_VIA_BASE)		? "ClientViaBase" :
+		(type_ == ENTITYCALL_TYPE_CROSS_SERVER_CELL)	? "CellCrossServer" :
+		(type_ == ENTITYCALL_TYPE_CROSS_SERVER_BASE)	? "BaseCrossServer" :
+		(type_ == ENTITYCALL_TYPE_CROSS_SERVER_CLIENT)	? "ClientCrossServer" : "???";
 	
 	Network::Channel* pChannel = getChannel();
 

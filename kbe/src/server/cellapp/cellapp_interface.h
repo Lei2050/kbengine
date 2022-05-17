@@ -52,6 +52,10 @@ NETWORK_INTERFACE_DECLARE_BEGIN(CellappInterface)
 	// console远程执行python语句。
 	CELLAPP_MESSAGE_DECLARE_STREAM(onExecScriptCommand,								NETWORK_VARIABLE_MESSAGE)
 
+	// dbmgr 注册到 centermgr 成功
+	CELLAPP_MESSAGE_DECLARE_ARGS1(onRegisterCentermgr,								NETWORK_FIXED_MESSAGE,
+									COMPONENT_ORDER,								centerID)
+
 	// dbmgr告知已经启动的其他baseapp或者cellapp的地址
 	// 当前app需要主动的去与他们建立连接
 	CELLAPP_MESSAGE_DECLARE_ARGS11(onGetEntityAppFromDbmgr,							NETWORK_VARIABLE_MESSAGE,
@@ -84,6 +88,7 @@ NETWORK_INTERFACE_DECLARE_BEGIN(CellappInterface)
 	// global数据改变
 	CELLAPP_MESSAGE_DECLARE_STREAM(onBroadcastGlobalDataChanged,					NETWORK_VARIABLE_MESSAGE)
 	CELLAPP_MESSAGE_DECLARE_STREAM(onBroadcastCellAppDataChanged,					NETWORK_VARIABLE_MESSAGE)
+	CELLAPP_MESSAGE_DECLARE_STREAM(onBroadcastCenterDataChanged,					NETWORK_VARIABLE_MESSAGE)
 
 	// baseEntity请求创建在一个新的space中。
 	CELLAPP_MESSAGE_DECLARE_STREAM(onCreateCellEntityInNewSpaceFromBaseapp,			NETWORK_VARIABLE_MESSAGE)

@@ -33,6 +33,8 @@ COMPONENT_GUS g_genuuid_sections = -1;
 
 GAME_TIME g_kbetime = 0;
 
+COMPONENT_ORDER g_centerID = 0;
+
 //-------------------------------------------------------------------------------------
 ServerApp::ServerApp(Network::EventDispatcher& dispatcher, 
 					 Network::NetworkInterface& ninterface, 
@@ -314,6 +316,14 @@ void ServerApp::onIdentityillegal(COMPONENT_TYPE componentType, COMPONENT_ID com
 }
 
 //-------------------------------------------------------------------------------------
+void ServerApp::onAllComponentFound()
+{}
+
+//-------------------------------------------------------------------------------------
+void ServerApp::onComponentActiveTickTimeout()
+{}
+
+//-------------------------------------------------------------------------------------
 void ServerApp::onRemoveComponent(const Components::ComponentInfos* pInfos)
 {
 	if(pInfos->componentType == LOGGER_TYPE)
@@ -339,6 +349,12 @@ void ServerApp::onRemoveComponent(const Components::ComponentInfos* pInfos)
 		if (g_componentType == BASEAPP_TYPE)
 			this->shutDown(1.f);
 	}
+}
+
+void ServerApp::onRegisterCentermgr(Network::Channel * pChannel, COMPONENT_ORDER centerID)
+{
+	INFO_MSG(fmt::format("ServerApp::onRegisterCentermgr success: centerID:{}\n", centerID));
+	g_centerID = centerID;
 }
 
 //-------------------------------------------------------------------------------------

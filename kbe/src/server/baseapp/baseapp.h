@@ -278,6 +278,18 @@ public:
 	void onBroadcastBaseAppDataChanged(Network::Channel* pChannel, KBEngine::MemoryStream& s);
 
 	/** 网络接口
+		跨服登录请求
+	*/
+	void receiveAcrossServerRequest(Network::Channel *pChannel, KBEngine::MemoryStream& s);
+
+	void acrossLogin(Network::Channel *pChannel, std::string accountName, std::string password, int8 clientType, uint64 loginKey);
+
+	/* 网络接口
+	*  收到跨服登录请求成功的通知
+	*/
+	void receiveAcrossServerSuccess(Network::Channel *pChannel, KBEngine::MemoryStream& s);
+
+	/** 网络接口
 		注册将要登录的账号, 注册后则允许登录到此网关
 	*/
 	void registerPendingLogin(Network::Channel* pChannel, KBEngine::MemoryStream& s);
@@ -304,6 +316,12 @@ public:
 	void reloginBaseapp(Network::Channel* pChannel, std::string& accountName, 
 		std::string& password, uint64 key, ENTITY_ID entityID);
 
+	/**
+		登录成功
+	*/
+	void loginBaseappSuccessfully(Network::Channel* pChannel, std::string& accountName,
+		KBEngine::uint64 proxyUid, bool relogin = false);
+	
 	/**
 	   登录失败
 	   @failedcode: 失败返回码 NETWORK_ERR_SRV_NO_READY:服务器没有准备好, 

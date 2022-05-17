@@ -215,6 +215,19 @@ public:
 	void onTeleportFailure();  
 	void onTeleportSuccess(SPACE_ID spaceID);
 
+	/**
+	    发起跨服
+	*/
+	DECLARE_PY_MOTHOD_ARG1(pyAcrossServer, PyObject_ptr)
+	void acrossServer(PyObject_ptr baseEntityCallRef);
+
+	/**
+		跨服回调	uint64 loginKey;
+	std::string dstBaseappIP;
+	uint16 port;
+	*/
+	void acrossServerSuccess(MemoryStream& s);
+
 	/** 网络接口
 		entity请求迁移到另一个cellapp上的过程开始和结束。
 	*/

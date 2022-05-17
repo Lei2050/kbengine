@@ -69,6 +69,9 @@
     <ClCompile Include="py_entitydef.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="entitycall_cross_server.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="common.h">
@@ -129,6 +132,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="py_entitydef.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="entitycall_cross_server.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

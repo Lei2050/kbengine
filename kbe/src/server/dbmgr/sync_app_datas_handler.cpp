@@ -126,6 +126,14 @@ bool SyncAppDatasHandler::process()
 					BaseappInterface::onDbmgrInitCompletedArgs6::staticAddToBundle((*pBundle), g_kbetime, idRange.first, 
 						idRange.second, cInitInfo.startGlobalOrder, cInitInfo.startGroupOrder, 
 						digest);
+					
+					if (g_centerID > 0)
+					{
+						Network::Bundle* centerIDBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
+						centerIDBundle->newMessage(BaseappInterface::onRegisterCentermgr);
+						(*centerIDBundle) << g_centerID;
+						cinfos->pChannel->send(centerIDBundle);
+					}
 				}
 				break;
 			case CELLAPP_TYPE:
@@ -137,6 +145,14 @@ bool SyncAppDatasHandler::process()
 					CellappInterface::onDbmgrInitCompletedArgs6::staticAddToBundle((*pBundle), g_kbetime, idRange.first, 
 						idRange.second, cInitInfo.startGlobalOrder, cInitInfo.startGroupOrder, 
 						digest);
+					
+					if (g_centerID > 0)
+					{
+						Network::Bundle* centerIDBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
+						centerIDBundle->newMessage(CellappInterface::onRegisterCentermgr);
+						(*centerIDBundle) << g_centerID;
+						cinfos->pChannel->send(centerIDBundle);
+					}
 				}
 				break;
 			case LOGINAPP_TYPE:

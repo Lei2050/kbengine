@@ -51,6 +51,10 @@ NETWORK_INTERFACE_DECLARE_BEGIN(BaseappInterface)
 	// console远程执行python语句。
 	BASEAPP_MESSAGE_DECLARE_STREAM(onExecScriptCommand,								NETWORK_VARIABLE_MESSAGE)
 
+	// dbmgr 注册到 centermgr 成功
+	BASEAPP_MESSAGE_DECLARE_ARGS1(onRegisterCentermgr,								NETWORK_FIXED_MESSAGE,
+									COMPONENT_ORDER,								centerID)
+
 	// 某app注册自己的接口地址到本app
 	BASEAPP_MESSAGE_DECLARE_ARGS11(onRegisterNewApp,								NETWORK_VARIABLE_MESSAGE,
 									int32,											uid, 
@@ -102,6 +106,13 @@ NETWORK_INTERFACE_DECLARE_BEGIN(BaseappInterface)
 	// global数据改变
 	BASEAPP_MESSAGE_DECLARE_STREAM(onBroadcastGlobalDataChanged,					NETWORK_VARIABLE_MESSAGE)
 	BASEAPP_MESSAGE_DECLARE_STREAM(onBroadcastBaseAppDataChanged,					NETWORK_VARIABLE_MESSAGE)
+	BASEAPP_MESSAGE_DECLARE_STREAM(onBroadcastCenterDataChanged,					NETWORK_VARIABLE_MESSAGE)
+
+	// 收到跨服登录请求
+	BASEAPP_MESSAGE_DECLARE_STREAM(receiveAcrossServerRequest,						NETWORK_VARIABLE_MESSAGE)
+
+	// 收到跨服登录请求成功的通知
+	BASEAPP_MESSAGE_DECLARE_STREAM(receiveAcrossServerSuccess,						NETWORK_VARIABLE_MESSAGE)
 
 	// 某个app向本app告知处于活动状态。
 	BASEAPP_MESSAGE_DECLARE_ARGS2(onAppActiveTick,									NETWORK_FIXED_MESSAGE,
@@ -159,6 +170,14 @@ NETWORK_INTERFACE_DECLARE_BEGIN(BaseappInterface)
 									std::string,									password,
 									uint64,											key,
 									ENTITY_ID,										entityID)
+
+	// 前端请求登录到网关上。
+	BASEAPP_MESSAGE_EXPOSED(acrossLogin)
+	BASEAPP_MESSAGE_DECLARE_ARGS4(acrossLogin,										NETWORK_VARIABLE_MESSAGE,
+									std::string,									accountName,
+									std::string,									password,
+									int8,											clientType,
+									uint64,											loginKey)
 
 	// 从dbmgr获取到账号Entity信息
 	BASEAPP_MESSAGE_DECLARE_STREAM(onQueryAccountCBFromDbmgr,						NETWORK_VARIABLE_MESSAGE)

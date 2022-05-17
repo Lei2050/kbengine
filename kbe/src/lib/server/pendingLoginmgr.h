@@ -52,6 +52,14 @@ public:
 		bool forceInternalLogin;
 		bool needCheckPassword;
 	};
+	
+	// 用于跨服登录的pending数据
+	struct AcrossPLInfos : public PLInfos
+	{
+		ENTITY_ID srcEntityID;
+		std::string dbInterfaceName;
+		uint64 loginKey;
+	};
 
 	typedef KBEUnordered_map<std::string, PLInfos*> PTINFO_MAP;
 

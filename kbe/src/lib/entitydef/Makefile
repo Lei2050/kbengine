@@ -9,6 +9,7 @@ SRCS =				\
 	entity_component\
 	entity_component_call	\
 	entity_call		\
+	entitycall_cross_server	\
 	entitydef		\
 	py_entitydef	\
 	entitycallabstract		\

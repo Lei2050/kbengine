@@ -74,7 +74,7 @@ public:
 	void sendIfDelayed(Channel & channel);
 	void delayedSend(Channel & channel);
 	
-	bool good() const{ return (!pExtListenerReceiver_ || extTcpEndpoint_.good()) && (intTcpEndpoint_.good()); }
+	bool good() const{ return (!pExtListenerReceiver_ || extEndpoint_.good()) && (!pIntListenerReceiver_ || intEndpoint_.good()); }
 
 	void onChannelTimeOut(Channel * pChannel);
 	

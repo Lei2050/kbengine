@@ -19,6 +19,7 @@ endif
 	$(MAKE) -C baseappmgr $@
 	$(MAKE) -C cellapp $@
 	$(MAKE) -C cellappmgr $@
+	$(MAKE) -C centermgr $@
 	$(MAKE) -C dbmgr $@
 	$(MAKE) -C loginapp $@
 	$(MAKE) -C machine $@

@@ -18,12 +18,13 @@ public:
 	{
 		GLOBAL_DATA,
 		BASEAPP_DATA,
-		CELLAPP_DATA
+		CELLAPP_DATA,
+		CENTER_DATA
 	};
 
 public:	
 	GlobalDataServer(DATA_TYPE dataType);
-	~GlobalDataServer();
+	virtual ~GlobalDataServer();
 			
 	/** 写数据 */
 	bool write(Network::Channel* pChannel, COMPONENT_TYPE componentType, const std::string& key, const std::string& value);
@@ -35,13 +36,13 @@ public:
 	void addConcernComponentType(COMPONENT_TYPE ct){ concernComponentTypes_.push_back(ct); }
 	
 	/** 广播一个数据的改变给所关心的组件 */
-	void broadcastDataChanged(Network::Channel* pChannel, COMPONENT_TYPE componentType, const std::string& key, 
+	virtual void broadcastDataChanged(Network::Channel* pChannel, COMPONENT_TYPE componentType, const std::string& key, 
 							const std::string& value, bool isDelete = false);
 	
 	/** 一个新的客户端登陆 */
 	void onGlobalDataClientLogon(Network::Channel* client, COMPONENT_TYPE componentType);
 
-private:
+protected:
 	DATA_TYPE dataType_;
 
 	std::vector<COMPONENT_TYPE> concernComponentTypes_;						// 该GlobalDataServer所需要关心的组件类别

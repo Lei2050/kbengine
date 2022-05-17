@@ -34,6 +34,12 @@ INLINE ENGINE_COMPONENT_INFO& ServerConfig::getCellAppMgr(void)
 }
 
 //-------------------------------------------------------------------------------------
+INLINE ENGINE_COMPONENT_INFO& ServerConfig::getCenterMgr(void)
+{
+	return _centerMgrInfo;
+}
+
+//-------------------------------------------------------------------------------------
 ENGINE_COMPONENT_INFO& ServerConfig::getBaseAppMgr(void)
 {
 	return _baseAppMgrInfo;
@@ -141,6 +147,17 @@ INLINE bool ServerConfig::isPureDBInterfaceName(const std::string& dbInterfaceNa
 }
 
 //-------------------------------------------------------------------------------------	
+INLINE bool ServerConfig::IsAcrossDB(size_t dbInterfaceIndex)
+{
+	if (_dbmgrInfo.dbInterfaceInfos.size() > dbInterfaceIndex)
+	{
+		return _dbmgrInfo.dbInterfaceInfos[dbInterfaceIndex].acrossDB;
+	}
+
+	return false;
+}
+
+//-------------------------------------------------------------------------------------	
 INLINE int ServerConfig::dbInterfaceName2dbInterfaceIndex(const std::string& dbInterfaceName)
 {
 	for (size_t i = 0; i < _dbmgrInfo.dbInterfaceInfos.size(); ++i)
@@ -163,6 +180,25 @@ INLINE const char* ServerConfig::dbInterfaceIndex2dbInterfaceName(size_t dbInter
 	}
 
 	return "";
+}
+
+//-------------------------------------------------------------------------------------	
+INLINE bool ServerConfig::getDBInfoByInterfaceName(const char *interfaceName, std::string &addr, std::string &dbName)
+{
+	ENGINE_COMPONENT_INFO &dbinfo = getDBMgr();
+
+	std::vector<DBInterfaceInfo>::iterator iter = dbinfo.dbInterfaceInfos.begin();
+	for (; iter != dbinfo.dbInterfaceInfos.end(); iter++)
+	{
+		if (strcmp(iter->name, interfaceName) == 0)
+		{
+			addr = iter->db_ip;
+			dbName = iter->db_name;
+			return true;
+		}
+	}
+
+	return false;
 }
 
 //-------------------------------------------------------------------------------------	

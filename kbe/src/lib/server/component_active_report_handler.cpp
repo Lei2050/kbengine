@@ -79,6 +79,9 @@ void ComponentActiveReportHandler::handleTimeout(TimerHandle handle, void * arg)
 
 				ifind++;
 			}
+
+			// 通知 app ,以便进行一些其它 component 的连接维持
+			pApp_->onComponentActiveTickTimeout();
 			break;
 		}
 		default:

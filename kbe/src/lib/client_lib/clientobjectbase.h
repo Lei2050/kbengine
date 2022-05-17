@@ -185,6 +185,11 @@ public:
 	virtual void onReloginBaseappFailed(Network::Channel * pChannel, SERVER_ERROR_CODE failedcode);
 
 	/** 网络接口
+	登陆baseapp成功
+	*/
+	virtual void onLoginBaseappSuccessfully(Network::Channel * pChannel, MemoryStream& s);
+
+	/** 网络接口
 	   重登陆baseapp成功
 	*/
 	virtual void onReloginBaseappSuccessfully(Network::Channel * pChannel, MemoryStream& s);
@@ -379,6 +384,11 @@ public:
 		请求修改密码返回
 	*/
 	virtual void onReqAccountNewPasswordCB(Network::Channel* pChannel, SERVER_ERROR_CODE failedcode){}
+
+	/** 网络接口
+	    跨服已经准备好
+	*/
+	virtual void acrossServerReady(Network::Channel* pChannel, MemoryStream& s);
 
 	/** 
 		获得player实例

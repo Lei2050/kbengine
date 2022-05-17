@@ -185,6 +185,11 @@ public:
 	virtual void onLoginBaseappFailed(Network::Channel * pChannel, SERVER_ERROR_CODE failedcode);
 
 	/** 网络接口
+		登陆baseapp成功
+	*/
+	virtual void onLoginBaseappSuccessfully(Network::Channel * pChannel, MemoryStream& s);
+
+	/** 网络接口
 	   重登陆baseapp成功
 	*/
 	virtual void onReloginBaseappSuccessfully(Network::Channel * pChannel, MemoryStream& s);
@@ -359,6 +364,11 @@ public:
 		服务器心跳返回
 	*/
 	void onAppActiveTickCB(Network::Channel* pChannel);
+
+	/** 网络接口
+		跨服已经准备好
+	*/
+	virtual void acrossServerReady(Network::Channel* pChannel, MemoryStream& s);
 
 protected:
 	PyBots*													pPyBots_;

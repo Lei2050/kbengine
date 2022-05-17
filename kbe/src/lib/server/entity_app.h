@@ -143,6 +143,10 @@ public:
 	*/
 	void onBroadcastGlobalDataChanged(Network::Channel* pChannel, KBEngine::MemoryStream& s);
 
+	/** 网络接口
+		dbmgr广播centerData数据的改变
+	*/
+	void onBroadcastCenterDataChanged(Network::Channel* pChannel, KBEngine::MemoryStream& s);
 
 	/** 网络接口
 		请求执行一段python指令
@@ -232,6 +236,9 @@ protected:
 	// globalData
 	GlobalDataClient*										pGlobalData_;
 
+	// centerData
+	GlobalDataClient*										pCenterData_;
+
 	PY_CALLBACKMGR											pyCallbackMgr_;
 
 	uint64													lastTimestamp_;
@@ -254,6 +261,7 @@ idClient_(),
 pEntities_(NULL),
 gameTimer_(),
 pGlobalData_(NULL),
+pCenterData_(NULL),
 pyCallbackMgr_(),
 lastTimestamp_(timestamp()),
 load_(0.f)
@@ -418,6 +426,10 @@ bool EntityApp<E>::installPyModules()
 	pGlobalData_ = new GlobalDataClient(DBMGR_TYPE, GlobalDataServer::GLOBAL_DATA);
 	registerPyObjectToScript("globalData", pGlobalData_);
 	
+	// 跨服全局数据 KBEngine.centerData
+	pCenterData_ = new GlobalDataClient(DBMGR_TYPE, GlobalDataServer::CENTER_DATA);
+	registerPyObjectToScript("centerData", pCenterData_);
+	
 	// 注册创建entity的方法到py
 	// 允许assert底层，用于调试脚本某个时机时底层状态
 	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(),	kbassert,			__py_assert,							METH_VARARGS,	0);
@@ -536,6 +548,9 @@ bool EntityApp<E>::uninstallPyModules()
 	// script::PyGC::collect();
 	unregisterPyObjectToScript("globalData");
 	S_RELEASE(pGlobalData_); 
+
+	unregisterPyObjectToScript("centerData");
+	S_RELEASE(pCenterData_);
 
 	S_RELEASE(pEntities_);
 	unregisterPyObjectToScript("entities");
@@ -1306,6 +1321,64 @@ void EntityApp<E>::onBroadcastGlobalDataChanged(Network::Channel* pChannel, KBEn
 			// 通知脚本
 			// SCOPED_PROFILE(SCRIPTCALL_PROFILE);
 			SCRIPT_OBJECT_CALL_ARGS2(getEntryScript().get(), const_cast<char*>("onGlobalData"), 
+				const_cast<char*>("OO"), pyKey, pyValue, false);
+		}
+
+		Py_DECREF(pyValue);
+	}
+
+	Py_DECREF(pyKey);
+}
+
+template<class E>
+void EntityApp<E>::onBroadcastCenterDataChanged(Network::Channel* pChannel, KBEngine::MemoryStream& s)
+{
+	if (pChannel->isExternal())
+		return;
+
+	std::string key, value;
+	bool isDelete;
+
+	s >> isDelete;
+	s.readBlob(key);
+
+	if (!isDelete)
+	{
+		s.readBlob(value);
+	}
+
+	PyObject * pyKey = script::Pickler::unpickle(key);
+	if (pyKey == NULL)
+	{
+		ERROR_MSG("EntityApp::onBroadcastCenterDataChanged: no has key!\n");
+		return;
+	}
+
+	if (isDelete)
+	{
+		if (pCenterData_->del(pyKey))
+		{
+			// 通知脚本
+			// SCOPED_PROFILE(SCRIPTCALL_PROFILE);
+			SCRIPT_OBJECT_CALL_ARGS1(getEntryScript().get(), const_cast<char*>("onCenterDataDel"),
+				const_cast<char*>("O"), pyKey, false);
+		}
+	}
+	else
+	{
+		PyObject * pyValue = script::Pickler::unpickle(value);
+		if (pyValue == NULL)
+		{
+			ERROR_MSG("EntityApp::onBroadcastCenterDataChanged: no has value!\n");
+			Py_DECREF(pyKey);
+			return;
+		}
+
+		if (pCenterData_->write(pyKey, pyValue))
+		{
+			// 通知脚本
+			// SCOPED_PROFILE(SCRIPTCALL_PROFILE);
+			SCRIPT_OBJECT_CALL_ARGS2(getEntryScript().get(), const_cast<char*>("onCenterData"),
 				const_cast<char*>("OO"), pyKey, pyValue, false);
 		}
 

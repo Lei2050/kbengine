@@ -88,6 +88,7 @@ public:
 		virtual void onAddComponent(const Components::ComponentInfos*) = 0;
 		virtual void onRemoveComponent(const Components::ComponentInfos*) = 0;
 		virtual void onIdentityillegal(COMPONENT_TYPE componentType, COMPONENT_ID componentID, uint32 pid, const char* pAddr) = 0;
+		virtual void onAllComponentFound() = 0;
 	};
 
 public:

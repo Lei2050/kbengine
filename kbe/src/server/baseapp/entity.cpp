@@ -8,6 +8,7 @@
 #include "entitydef/entity_call.h"
 #include "entitydef/entity_component.h"
 #include "entitydef/entitydef.h"
+#include "entitydef/entitycall_cross_server.h"
 #include "network/channel.h"	
 #include "network/fixed_messages.h"
 #include "client_lib/client_interface.h"
@@ -27,6 +28,7 @@ ENTITY_METHOD_DECLARE_BEGIN(Baseapp, Entity)
 SCRIPT_METHOD_DECLARE("createCellEntity",				createCellEntity,				METH_VARARGS,			0)
 SCRIPT_METHOD_DECLARE("createCellEntityInNewSpace",		createCellEntityInNewSpace,		METH_VARARGS,			0)
 SCRIPT_METHOD_DECLARE("destroyCellEntity",				pyDestroyCellEntity,			METH_VARARGS,			0)
+SCRIPT_METHOD_DECLARE("acrossServer",					pyAcrossServer,					METH_VARARGS,			0)
 ENTITY_METHOD_DECLARE_END()
 
 SCRIPT_MEMBER_DECLARE_BEGIN(Entity)
@@ -1661,6 +1663,125 @@ void Entity::onTimer(ScriptID timerID, int useraAgs)
 bool Entity::_reload(bool fullReload)
 {
 	return true;
+}
+
+//-------------------------------------------------------------------------------------
+PyObject *Entity::pyAcrossServer(PyObject_ptr acrossServerBaseRef)
+{
+	if (this->isDestroyed())
+	{
+		PyErr_Format(PyExc_AssertionError, "%s::acrossServer: %d is destroyed!\n",
+			scriptName(), id());
+		PyErr_PrintEx(0);
+		return 0;
+	}
+
+	if (!PyObject_TypeCheck(this, Proxy::getScriptType()))
+	{
+		PyErr_Format(PyExc_AssertionError, "%s::acrossServer: %d is not a account!\n",
+			scriptName(), id());
+		PyErr_PrintEx(0);
+		return 0;
+	}
+
+	this->acrossServer(acrossServerBaseRef);
+	S_Return;
+}
+
+//-------------------------------------------------------------------------------------
+void Entity::acrossServer(PyObject_ptr acrossServerBaseRef)
+{
+	if (acrossServerBaseRef == Py_None)
+	{
+		PyErr_Format(PyExc_AssertionError, "%s::acrossServer: %d acrossServerBaseRef cant be None!\n",
+			scriptName(), id());
+		PyErr_PrintEx(0);
+		return;
+	}
+
+	if(!PyObject_TypeCheck(acrossServerBaseRef, EntityCallCrossServer::getScriptType()))
+	{
+		PyErr_Format(PyExc_AssertionError, "%s::acrossServer: %d acrossServerBaseRef must be EntityCallCrossServer!\n",
+			scriptName(), id());
+		PyErr_PrintEx(0);
+		return;
+	}
+
+	PyObject* isAcrossServer = PyObject_GetAttrString(this, "isAcrossServer");
+	if (isAcrossServer == Py_True) 
+	{
+		PyErr_Format(PyExc_AssertionError, "%s::acrossServer: %d is in across server state!\n",
+			scriptName(), id());
+		PyErr_PrintEx(0);
+		return;
+	}
+
+	PyObject *py__ACCOUNT_NAME__ = PyObject_GetAttrString(this, "__ACCOUNT_NAME__");
+	if (py__ACCOUNT_NAME__ == NULL)
+	{
+		ERROR_MSG(fmt::format("Entity::acrossServer: {}({}) not found __ACCOUNT_NAME__!\n", this->scriptName(), id()));
+		PyErr_Clear();
+		return;
+	}
+	wchar_t *wname = PyUnicode_AsWideCharString(py__ACCOUNT_NAME__, NULL);
+	char* name = strutil::wchar2char(wname);
+	PyMem_Free(wname);
+	std::string accountName = name;
+	free(name);
+	Py_DECREF(py__ACCOUNT_NAME__);
+
+	std::string dbip;
+	std::string dbName;
+	const char *dbinterfaceName = g_kbeSrvConfig.dbInterfaceIndex2dbInterfaceName(dbInterfaceIndex());
+	if (!g_kbeSrvConfig.getDBInfoByInterfaceName(dbinterfaceName, dbip, dbName))
+	{
+		ERROR_MSG(fmt::format("Entity::acrossServer: {}({}) not found db interface({})!\n", this->scriptName(), id(), dbinterfaceName));
+		return;
+	}
+
+	Network::Bundle *bundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
+	bundle->newMessage(DbmgrInterface::requestAcrossServer);
+
+	EntityCallCrossServer* acrossEntityCall = static_cast<EntityCallCrossServer *>(acrossServerBaseRef);
+	(*bundle) << acrossEntityCall->centerID() << acrossEntityCall->componentID() << g_centerID << g_componentID << id() << accountName << dbip << dbName;
+
+	Components::ComponentInfos* dbinfos = Components::getSingleton().getDbmgr();
+	if (dbinfos && dbinfos->pChannel)
+	{
+		dbinfos->pChannel->send(bundle);
+	}
+	else
+	{
+		ERROR_MSG(fmt::format("{}::acrossServer({}): not found dbmgr!\n",
+			this->scriptName(), this->id()));
+	}
+}
+
+//-------------------------------------------------------------------------------------
+void Entity::acrossServerSuccess(MemoryStream& s)
+{
+	DEBUG_MSG("Entity::acrossServerSuccess->>>");
+	SCOPED_PROFILE(SCRIPTCALL_PROFILE);
+
+	/*
+	uint64 loginKey;
+	std::string dstBaseappIP;
+	uint16 port;
+	s >> loginKey >> dstBaseappIP >> port;
+	*/
+
+	// 按照当前的设计来说，有clientEntityCall_必定是proxy
+	// 至于为何跑到baseEntity里来和python本身是C语言实现有关
+	if (clientEntityCall_)
+	{
+		Network::Bundle *bundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
+		bundle->newMessage(ClientInterface::acrossServerReady);
+		bundle->append(s);
+		static_cast<Proxy *>(this)->sendToClient(bundle);
+		s.done();
+
+		SCRIPT_OBJECT_CALL_ARGS0(this, const_cast<char*>("onAcrossServerReady"), false);
+	}
 }
 
 //-------------------------------------------------------------------------------------

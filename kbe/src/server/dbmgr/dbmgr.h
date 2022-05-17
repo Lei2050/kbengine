@@ -9,6 +9,8 @@
 #include "pyscript/script.h"
 #include "pyscript/pyobject_pointer.h"
 #include "entitydef/entitydef.h"
+#include "entitydef/entity_call.h"
+#include "server/components.h"
 #include "server/python_app.h"
 #include "server/idallocate.h"
 #include "server/serverconfig.h"
@@ -71,13 +73,60 @@ public:
 	virtual void onShutdownBegin();
 	virtual void onShutdownEnd();
 
+	virtual void onAllComponentFound();
+	bool isCentermgrEnable();
+	bool isCentermgrChannel(Network::Channel *channel);
+	void findCentermgr();
+
+	virtual void onComponentActiveTickTimeout();
+
 	/** 获取ID服务器指针 */
 	IDServer<ENTITY_ID>& idServer(void){ return idServer_; }
+
+	/** 网络接口
+		某个app向本app告知处于活动状态。
+	*/
+	virtual void onAppActiveTick(Network::Channel* pChannel, COMPONENT_TYPE componentType, COMPONENT_ID componentID);
 
 	/** 网络接口
 		请求分配一个ENTITY_ID段
 	*/
 	void onReqAllocEntityID(Network::Channel* pChannel, COMPONENT_ORDER componentType, COMPONENT_ID componentID);
+
+	/** 网络接口
+		dbmgr 注册到 centermgr 成功
+	*/
+	virtual void onRegisterCentermgr(Network::Channel* pChannel, COMPONENT_ORDER centerID);
+
+	/** 网络接口
+	收到跨服call请求, 由某个app上的entityCallCrossServer发起(只限与服务器内部使用)
+	*/
+	void requestEntityCallCrossServer(Network::Channel* pChannel, KBEngine::MemoryStream& s);
+
+	/** 网络接口
+	收到跨服call请求, 由某个app上的entityCallCrossServer发起,调用到本服某个app
+	*/
+	void onEntityCallCrossServer(Network::Channel* pChannel, KBEngine::MemoryStream& s);
+
+	/** 网络接口
+	跨服登录请求
+	*/
+	void requestAcrossServer(Network::Channel *pChannel, KBEngine::MemoryStream& s);
+
+	/** 网络接口
+	接收跨服登录请求
+	*/
+	void receiveAcrossServerRequest(Network::Channel *pChannel, KBEngine::MemoryStream& s);
+
+	/* 网络接口
+	* 请求跨服登录成功
+	*/
+	void requestAcrossServerSuccess(Network::Channel *pChannel, KBEngine::MemoryStream& s);
+
+	/* 网络接口
+	* 收到跨服请求成功的通知
+	*/
+	void receiveAcrossServerSuccess(Network::Channel *pChannel, KBEngine::MemoryStream& s);
 
 	/* 网络接口
 		注册一个新激活的baseapp或者cellapp或者dbmgr
@@ -95,6 +144,7 @@ public:
 	*/
 	void onGlobalDataClientLogon(Network::Channel* pChannel, COMPONENT_TYPE componentType);
 	void onBroadcastGlobalDataChanged(Network::Channel* pChannel, KBEngine::MemoryStream& s);
+	void onBroadcastCenterDataChanged(Network::Channel* pChannel, KBEngine::MemoryStream& s);
 	
 	/** 网络接口
 		请求创建账号
@@ -116,7 +166,7 @@ public:
 	/** 网络接口
 		baseapp请求查询account信息
 	*/
-	void queryAccount(Network::Channel* pChannel, std::string& accountName, std::string& password, bool needCheckPassword,
+	void queryAccount(Network::Channel* pChannel, std::string& accountName, std::string& password, std::string& dbInterfaceName, bool needCheckPassword,
 		COMPONENT_ID componentID, ENTITY_ID entityID, DBID entityDBID, uint32 ip, uint16 port);
 
 	/** 网络接口
@@ -225,6 +275,10 @@ public:
 
 	virtual void onChannelDeregister(Network::Channel * pChannel);
 
+	PyObject* tryGetEntityByEntityCall(COMPONENT_ID componentID, ENTITY_ID eid);
+
+	Network::Channel * findChannelByEntityCall(EntityCall & entitycall);
+
 	InterfacesHandler* findBestInterfacesHandler();
 
 	/**
@@ -252,6 +306,9 @@ protected:
 	// cellAppData
 	GlobalDataServer*									pCellAppData_;
 
+	// 跨服全局数据 KBEngine.centerData
+	GlobalDataServer*									pCenterData_;
+
 	typedef KBEUnordered_map<std::string, Buffered_DBTasks> BUFFERED_DBTASKS_MAP;
 	BUFFERED_DBTASKS_MAP								bufferedDBTasksMaps_;
 
@@ -272,6 +329,8 @@ protected:
 	std::map<COMPONENT_ID, uint64>						loseBaseappts_;
 
 	PY_CALLBACKMGR										pyCallbackMgr_;
+
+	Components::ComponentInfos							*centermgrInfo_;
 };
 
 }
