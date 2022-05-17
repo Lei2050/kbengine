@@ -277,7 +277,7 @@ public:
 
 	PyObject* tryGetEntityByEntityCall(COMPONENT_ID componentID, ENTITY_ID eid);
 
-	Network::Channel * findChannelByEntityCall(EntityCall & entitycall);
+	Network::Channel * findChannelByEntityCall(EntityCallAbstract& entitycall);
 
 	InterfacesHandler* findBestInterfacesHandler();
 

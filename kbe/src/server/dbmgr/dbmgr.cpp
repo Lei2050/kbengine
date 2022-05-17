@@ -64,11 +64,13 @@ Dbmgr::Dbmgr(Network::EventDispatcher& dispatcher,
 {
 	KBEngine::Network::MessageHandlers::pMainMessageHandlers = &DbmgrInterface::messageHandlers;
 
-	// 初始化entitycall模块获取entity实体函数地址
-	EntityCall::setGetEntityFunc(std::tr1::bind(&Dbmgr::tryGetEntityByEntityCall, this,
-		std::tr1::placeholders::_1, std::tr1::placeholders::_2));
+	//// 初始化entitycall模块获取entity实体函数地址
+	//EntityCall::setGetEntityFunc(std::tr1::bind(&Dbmgr::tryGetEntityByEntityCall, this,
+	//	std::tr1::placeholders::_1, std::tr1::placeholders::_2));
 
 	// 初始化entitycall模块获取channel函数地址
+	//EntityCall::setFindChannelFunc(std::tr1::bind(&Dbmgr::findChannelByEntityCall, this,
+	//	std::tr1::placeholders::_1));
 	EntityCall::setFindChannelFunc(std::tr1::bind(&Dbmgr::findChannelByEntityCall, this,
 		std::tr1::placeholders::_1));
 }
@@ -215,7 +217,7 @@ void Dbmgr::findCentermgr()
 	ep->setnonblocking(true);
 	u_int32_t ipint;
 	Network::Address::string2ip(g_serverConfig.getCenterMgr().externalAddress, ipint);
-	u_int16_t port = ntohs(g_serverConfig.getCenterMgr().externalPorts_min);
+	u_int16_t port = ntohs(g_serverConfig.getCenterMgr().externalTcpPorts_min);
 	ep->addr(port, ipint);
 
 	struct timeval tv = { 0, 1000000 };
@@ -290,8 +292,8 @@ void Dbmgr::findCentermgr()
 			Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 			(*pBundle).newMessage(CentermgrInterface::onAppRegister);
 			CentermgrInterface::onAppRegisterArgs7::staticAddToBundle((*pBundle), componentType_, componentID_,
-				networkInterface_.intaddr().ip, networkInterface_.intaddr().port,
-				networkInterface_.extaddr().ip, networkInterface_.extaddr().port, g_kbeSrvConfig.getConfig().externalAddress);
+				networkInterface_.intTcpAddr().ip, networkInterface_.intTcpAddr().port,
+				networkInterface_.extTcpAddr().ip, networkInterface_.extTcpAddr().port, g_kbeSrvConfig.getConfig().externalAddress);
 			pChannel->send(pBundle);
 
 			centermgrInfo_ = new Components::ComponentInfos;
@@ -1761,7 +1763,7 @@ PyObject* Dbmgr::tryGetEntityByEntityCall(COMPONENT_ID componentID, ENTITY_ID ei
 }
 
 //-------------------------------------------------------------------------------------
-Network::Channel* Dbmgr::findChannelByEntityCall(EntityCall& entitycall)
+Network::Channel* Dbmgr::findChannelByEntityCall(EntityCallAbstract& entitycall)
 {
 	// 如果组件ID大于0则查找组件
 	if (entitycall.componentID() > 0)

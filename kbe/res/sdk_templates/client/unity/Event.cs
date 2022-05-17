@@ -89,6 +89,11 @@
         public const string onLoginBaseappFailed = "onLoginBaseappFailed";
 
         /// <summary>
+        /// Baseapp success.
+        /// </summary>
+        public const string onLoginBaseappSuccessfully = "onLoginBaseappSuccessfully";
+
+        /// <summary>
         /// Relogin to baseapp.
         /// </summary>
         public const string onReloginBaseapp = "onReloginBaseapp";
@@ -103,6 +108,14 @@
         /// <para> param1(uint16): retcode. // server_errors</para>
         /// </summary>
         public const string onReloginBaseappFailed = "onReloginBaseappFailed";
+
+        /// <summary>
+        /// Notify client that across server is ready.
+        /// <para> param1(uint64): loginKey. </para>
+        /// <para> param2(string): baseapp ip address. </para>
+        /// <para> param3(uint16): baseapp port. </para>
+        /// </summary>
+        public const string onAcrossServerReady = "onAcrossServerReady";
 
         // ------------------------------------实体cell相关事件------------------------------------
 
@@ -255,6 +268,11 @@
         /// <para> param1(string): emailAddress</para>
         /// </summary>
         public const string bindAccountEmail = "bindAccountEmail";
+        
+        /// <summary>
+        /// acrossServerBack
+        /// </summary>
+        public const string acrossServerBack = "acrossServerBack";
     };
 
     /// <summary>

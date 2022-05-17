@@ -3708,9 +3708,9 @@ void Baseapp::receiveAcrossServerRequest(Network::Channel * pChannel, KBEngine::
 	}
 	else
 	{
-		(*bundle) << inet_ntoa((struct in_addr&)networkInterface().extaddr().ip);
+		(*bundle) << inet_ntoa((struct in_addr&)networkInterface().extTcpAddr().ip);
 	}
-	(*bundle) << ntohs(this->networkInterface().extaddr().port);
+	(*bundle) << ntohs(this->networkInterface().extTcpAddr().port);
 	pChannel->send(bundle);
 
 	PendingLoginMgr::AcrossPLInfos *infos = new PendingLoginMgr::AcrossPLInfos;

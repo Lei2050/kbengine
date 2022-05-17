@@ -1574,17 +1574,31 @@ bool ServerConfig::loadConfig(std::string fileName)
 		if (node != NULL)
 			strncpy((char*)&_centerMgrInfo.externalAddress, xml->getValStr(node).c_str(), MAX_NAME - 1);
 
-		node = xml->enterNode(rootNode, "externalPorts_min");
+		node = xml->enterNode(rootNode, "externalTcpPorts_min");
 		if (node != NULL)
-			_centerMgrInfo.externalPorts_min = xml->getValInt(node);
+			_kbMachineInfo.externalTcpPorts_min = xml->getValInt(node);
 
-		node = xml->enterNode(rootNode, "externalPorts_max");
+		node = xml->enterNode(rootNode, "externalTcpPorts_max");
 		if (node != NULL)
-			_centerMgrInfo.externalPorts_max = xml->getValInt(node);
-		if (_centerMgrInfo.externalPorts_min < 0)
-			_centerMgrInfo.externalPorts_min = 0;
-		if (_centerMgrInfo.externalPorts_max < _centerMgrInfo.externalPorts_min)
-			_centerMgrInfo.externalPorts_max = _centerMgrInfo.externalPorts_min;
+			_kbMachineInfo.externalTcpPorts_max = xml->getValInt(node);
+
+		if (_kbMachineInfo.externalTcpPorts_min < 0)
+			_kbMachineInfo.externalTcpPorts_min = 0;
+		if (_kbMachineInfo.externalTcpPorts_max < _kbMachineInfo.externalTcpPorts_min)
+			_kbMachineInfo.externalTcpPorts_max = _kbMachineInfo.externalTcpPorts_min;
+
+		node = xml->enterNode(rootNode, "externalUdpPorts_min");
+		if (node != NULL)
+			_kbMachineInfo.externalUdpPorts_min = xml->getValInt(node);
+
+		node = xml->enterNode(rootNode, "externalUdpPorts_max");
+		if (node != NULL)
+			_kbMachineInfo.externalUdpPorts_max = xml->getValInt(node);
+
+		if (_kbMachineInfo.externalUdpPorts_min < 0)
+			_kbMachineInfo.externalUdpPorts_min = 0;
+		if (_kbMachineInfo.externalUdpPorts_max < _kbMachineInfo.externalUdpPorts_min)
+			_kbMachineInfo.externalUdpPorts_max = _kbMachineInfo.externalUdpPorts_min;
 
 		node = xml->enterNode(rootNode, "addresses");
 		if (node)
@@ -2015,15 +2029,15 @@ void ServerConfig::updateInfos(bool isPrint, COMPONENT_TYPE componentType, COMPO
 	else if (componentType == CENTERMGR_TYPE)
 	{
 		ENGINE_COMPONENT_INFO& info = getCenterMgr();
-		info.internalAddr = const_cast<Network::Address*>(&internalAddr);
-		info.externalAddr = const_cast<Network::Address*>(&externalAddr);
+		info.internalTcpAddr = const_cast<Network::Address*>(&internalTcpAddr);
+		info.externalTcpAddr = const_cast<Network::Address*>(&externalTcpAddr);
 		info.componentID = componentID;
 
 		if (isPrint)
 		{
 			INFO_MSG("server-configs:\n");
-			INFO_MSG(fmt::format("\tinternalAddr : {}\n", internalAddr.c_str()));
-			INFO_MSG(fmt::format("\texternalAddr : {}\n", externalAddr.c_str()));
+			INFO_MSG(fmt::format("\internalTcpAddr : {}\n", internalTcpAddr.c_str()));
+			INFO_MSG(fmt::format("\externalTcpAddr : {}\n", externalTcpAddr.c_str()));
 			if (strlen(info.externalAddress) > 0)
 			{
 				INFO_MSG(fmt::format("\texternalCustomAddr : {}\n", info.externalAddress));
@@ -2032,8 +2046,8 @@ void ServerConfig::updateInfos(bool isPrint, COMPONENT_TYPE componentType, COMPO
 			INFO_MSG(fmt::format("\tcomponentID : {}\n", info.componentID));
 
 			infostr += "server-configs:\n";
-			infostr += (fmt::format("\tinternalAddr : {}\n", internalAddr.c_str()));
-			infostr += (fmt::format("\texternalAddr : {}\n", externalAddr.c_str()));
+			infostr += (fmt::format("\internalTcpAddr : {}\n", internalTcpAddr.c_str()));
+			infostr += (fmt::format("\externalTcpAddr : {}\n", externalTcpAddr.c_str()));
 
 			if (strlen(info.externalAddress) > 0)
 			{

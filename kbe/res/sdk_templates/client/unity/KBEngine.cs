@@ -73,6 +73,17 @@
 		public string baseappIP = "";
 		public UInt16 baseappTcpPort = 0;
 		public UInt16 baseappUdpPort = 0;
+				
+		//当前跨服baseapp地址
+		public string acrossBaseappIp = "";
+		public UInt16 acrossBaseappPort = 0;
+		public UInt64 acrossLoginKey = 0;
+		public bool isAcross = false;
+		public UInt64 lastSelectedRoleDbid = 0;
+		
+		// 原服务端分配的baseapp地址
+		public string baseappIP_bak = "";
+		public UInt16 baseappPort_bak = 0;
 
 		// 当前状态
 		public string currserver = "";
@@ -190,7 +201,8 @@
 			Event.registerIn(EventInTypes.resetPassword, this, "resetPassword");
 			Event.registerIn(EventInTypes.bindAccountEmail, this, "bindAccountEmail");
 			Event.registerIn(EventInTypes.newPassword, this, "newPassword");
-			
+			Event.registerIn(EventInTypes.acrossServerBack, this, "acrossServerBack");
+
 			// 内部事件
 			Event.registerIn("_closeNetwork", this, "_closeNetwork");
 		}
@@ -375,6 +387,63 @@
 		public void Client_onAppActiveTickCB()
 		{
 			_lastTickCBTime = System.DateTime.Now;
+		}
+
+		/*
+			切换跨服or本服环境，isAcross为true则切换到跨服，否则切换到本服
+		*/
+		private void shiftToArossEnv(bool isAcross)
+		{
+			if (isAcross)
+			{
+				//切换到跨服环境
+				baseappIP = acrossBaseappIp;
+				baseappTcpPort = acrossBaseappPort;
+				isAcross = true;
+			}
+			else
+			{
+				//切换到本服环境
+				baseappIP = baseappIP_bak;
+				baseappTcpPort = baseappPort_bak;
+				isAcross = false;
+			}
+		}
+		
+		public void Client_acrossServerReady(MemoryStream stream)
+		{
+			UInt64 loginKey = stream.readUint64();
+			string address = stream.readString();
+			UInt16 port = stream.readUint16();
+			
+			Dbg.DEBUG_MSG("KBEngine::Client_acrossServerReady: loginKey(" + loginKey 
+			                                                     + "), address("+ address
+			                                                     + "), port("+ port + ") !");
+			
+			acrossLoginKey = loginKey;
+			acrossBaseappIp = address;
+			acrossBaseappPort = port;
+			isAcross = true;
+			
+			Event.fireOut(EventOutTypes.onAcrossServerReady, loginKey, address, port);
+
+			shiftToArossEnv(true);
+			login_baseapp(true);
+			
+			//TODO 卧槽，临时处理。
+			//现在有个他妈的蛋疼的问题：收到onAcrossServerReady后，切换到跨服环境，然后调用acrossLogin，
+			//然后服务器走正常的登录到baseapp的流程。跨服重新创建Account、Avatar等，与客户端之前残留的Account、
+			//Avatar有冲突。所以这里临时这么处理一下。
+			//entities.Clear();
+		}
+		
+		/*
+			从跨服服务器退回到本服。
+		*/
+		public void acrossServerBack()
+		{
+			shiftToArossEnv(false);
+			login_baseapp(true);
 		}
 
 		/*
@@ -612,11 +681,24 @@
 			}
 			else
 			{
-				Bundle bundle = Bundle.createObject();
-				bundle.newMessage(Messages.messages["Baseapp_loginBaseapp"]);
-				bundle.writeString(username);
-				bundle.writeString(password);
-				bundle.send(_networkInterface);
+				if (!isAcross)
+				{
+					Bundle bundle = Bundle.createObject();
+					bundle.newMessage(Messages.messages["Baseapp_loginBaseapp"]);
+					bundle.writeString(username);
+					bundle.writeString(password);
+					bundle.send(_networkInterface);
+				}
+				else
+				{
+					Bundle bundle = Bundle.createObject();
+					bundle.newMessage(Messages.messages["Baseapp_acrossLogin"]);
+					bundle.writeString(username);
+					bundle.writeString(password);
+					bundle.writeInt8((sbyte)_args.clientType);
+					bundle.writeUint64(acrossLoginKey);
+					bundle.send(_networkInterface);
+				}
 			}
 		}
 
@@ -927,6 +1009,13 @@
 		{
 			Dbg.ERROR_MSG("KBEngine::Client_onLoginBaseappFailed: failedcode=" + failedcode + "("+ serverErr(failedcode) + ")!");
 			Event.fireAll(EventOutTypes.onLoginBaseappFailed, failedcode);
+		}
+		
+		public void Client_onLoginBaseappSuccessfully(MemoryStream stream)
+		{
+			entity_uuid = stream.readUint64();
+			Dbg.DEBUG_MSG("KBEngine::Client_onLoginBaseappSuccessfully: name(" + username + ")!");
+			Event.fireAll(EventOutTypes.onLoginBaseappSuccessfully);
 		}
 
 		/*

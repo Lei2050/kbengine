@@ -134,7 +134,6 @@ inTransaction_(false),
 lock_(NULL, false),
 characterSet_(characterSet),
 collation_(collation),
-collation_(collation),
 autoIncrementOffset_(autoIncrementOffset),
 autoIncrementIncrement_(autoIncrementIncrement)
 {

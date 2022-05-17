@@ -22,7 +22,7 @@ along with KBEngine.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "network/channel.h"
 #include "helper/debug_helper.h"
-#include "common/format.h"
+//#include "common/format.h"
 #include "centermgr/centermgr.h"
 #include "dbmgr/dbmgr_interface.h"
 

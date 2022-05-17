@@ -57,5 +57,6 @@ using namespace KBEngine;
 int KBENGINE_MAIN(int argc, char* argv[])
 {
 	ENGINE_COMPONENT_INFO& info = g_kbeSrvConfig.getCenterMgr();
-	return kbeMainT<Centermgr>(argc, argv, CENTERMGR_TYPE, info.externalPorts_min, info.externalPorts_max, "", -1, info.internalInterface);
+	return kbeMainT<Centermgr>(argc, argv, CENTERMGR_TYPE, info.externalTcpPorts_min, info.externalTcpPorts_max,
+		-1, -1, "", -1, -1, info.internalInterface);
 }
