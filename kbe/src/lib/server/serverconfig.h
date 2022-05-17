@@ -239,6 +239,8 @@ typedef struct EngineComponentInfo
 	bool debugDBMgr;										// debug模式下可输出读写操作信息
 
 	bool isOnInitCallPropertysSetMethods;					// 机器人(bots)专用：在Entity初始化时是否触发属性的set_*事件
+
+	bool isCrossServerEnable;								// 是否启用跨服功能
 } ENGINE_COMPONENT_INFO;
 
 class ServerConfig : public Singleton<ServerConfig>
@@ -293,6 +295,8 @@ public:
 	INLINE int dbInterfaceName2dbInterfaceIndex(const std::string& dbInterfaceName);
 	INLINE const char* dbInterfaceIndex2dbInterfaceName(size_t dbInterfaceIndex);
 	INLINE bool IsAcrossDB(size_t dbInterfaceIndex);
+
+	INLINE bool IsCrossServerEnable();
 
 	INLINE bool getDBInfoByInterfaceName(const char *interfaceName, std::string &addr, std::string &dbName);
 	std::string getDBInterfaceNameByDBInfo(const char *ip, const char *dbName);

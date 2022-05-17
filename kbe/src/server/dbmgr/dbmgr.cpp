@@ -192,8 +192,7 @@ void Dbmgr::onAllComponentFound()
 //-------------------------------------------------------------------------------------
 bool Dbmgr::isCentermgrEnable()
 {
-	// TODO: 检查配置是否启用了 centermgr
-	return true;
+	return g_serverConfig.IsCrossServerEnable();
 }
 
 //-------------------------------------------------------------------------------------
@@ -1088,6 +1087,7 @@ void Dbmgr::onBroadcastGlobalDataChanged(Network::Channel* pChannel, KBEngine::M
 					pyValue = static_cast<PyObject *>(new EntityCallCrossServer(g_centerID, entitycall));
 					value = script::Pickler::pickle(pyValue, 0);
 					delete pyValue;
+					Py_DECREF(pyValue);
 				}
 
 				len = value.length();

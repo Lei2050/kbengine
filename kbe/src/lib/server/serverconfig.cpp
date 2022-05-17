@@ -1562,6 +1562,10 @@ bool ServerConfig::loadConfig(std::string fileName)
 	rootNode = xml->getRootNode("centermgr");
 	if (rootNode != NULL)
 	{
+		node = xml->enterNode(rootNode, "enable");
+		if (node != NULL)
+			_centerMgrInfo.isCrossServerEnable = (xml->getValStr(node) == "true");
+
 		node = xml->enterNode(rootNode, "internalInterface");
 		if (node != NULL)
 			strncpy((char*)&_centerMgrInfo.internalInterface, xml->getValStr(node).c_str(), MAX_NAME - 1);
@@ -1576,29 +1580,29 @@ bool ServerConfig::loadConfig(std::string fileName)
 
 		node = xml->enterNode(rootNode, "externalTcpPorts_min");
 		if (node != NULL)
-			_kbMachineInfo.externalTcpPorts_min = xml->getValInt(node);
+			_centerMgrInfo.externalTcpPorts_min = xml->getValInt(node);
 
 		node = xml->enterNode(rootNode, "externalTcpPorts_max");
 		if (node != NULL)
-			_kbMachineInfo.externalTcpPorts_max = xml->getValInt(node);
+			_centerMgrInfo.externalTcpPorts_max = xml->getValInt(node);
 
-		if (_kbMachineInfo.externalTcpPorts_min < 0)
-			_kbMachineInfo.externalTcpPorts_min = 0;
-		if (_kbMachineInfo.externalTcpPorts_max < _kbMachineInfo.externalTcpPorts_min)
-			_kbMachineInfo.externalTcpPorts_max = _kbMachineInfo.externalTcpPorts_min;
+		if (_centerMgrInfo.externalTcpPorts_min < 0)
+			_centerMgrInfo.externalTcpPorts_min = 0;
+		if (_centerMgrInfo.externalTcpPorts_max < _centerMgrInfo.externalTcpPorts_min)
+			_centerMgrInfo.externalTcpPorts_max = _centerMgrInfo.externalTcpPorts_min;
 
 		node = xml->enterNode(rootNode, "externalUdpPorts_min");
 		if (node != NULL)
-			_kbMachineInfo.externalUdpPorts_min = xml->getValInt(node);
+			_centerMgrInfo.externalUdpPorts_min = xml->getValInt(node);
 
 		node = xml->enterNode(rootNode, "externalUdpPorts_max");
 		if (node != NULL)
-			_kbMachineInfo.externalUdpPorts_max = xml->getValInt(node);
+			_centerMgrInfo.externalUdpPorts_max = xml->getValInt(node);
 
-		if (_kbMachineInfo.externalUdpPorts_min < 0)
-			_kbMachineInfo.externalUdpPorts_min = 0;
-		if (_kbMachineInfo.externalUdpPorts_max < _kbMachineInfo.externalUdpPorts_min)
-			_kbMachineInfo.externalUdpPorts_max = _kbMachineInfo.externalUdpPorts_min;
+		if (_centerMgrInfo.externalUdpPorts_min < 0)
+			_centerMgrInfo.externalUdpPorts_min = 0;
+		if (_centerMgrInfo.externalUdpPorts_max < _centerMgrInfo.externalUdpPorts_min)
+			_centerMgrInfo.externalUdpPorts_max = _centerMgrInfo.externalUdpPorts_min;
 
 		node = xml->enterNode(rootNode, "addresses");
 		if (node)
