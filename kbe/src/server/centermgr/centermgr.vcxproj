@@ -175,6 +175,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\lib\dependencies\vsopenssl\include\openssl\applink.c" />
     <ClCompile Include="centerdata_server.cpp" />
     <ClCompile Include="centermgr.cpp" />
     <ClCompile Include="centermgr_interface.cpp" />

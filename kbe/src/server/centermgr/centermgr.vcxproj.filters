@@ -23,6 +23,9 @@
     <ClCompile Include="centerdata_server.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\lib\dependencies\vsopenssl\include\openssl\applink.c">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="centermgr.h">

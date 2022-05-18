@@ -64,13 +64,11 @@ Dbmgr::Dbmgr(Network::EventDispatcher& dispatcher,
 {
 	KBEngine::Network::MessageHandlers::pMainMessageHandlers = &DbmgrInterface::messageHandlers;
 
-	//// 初始化entitycall模块获取entity实体函数地址
-	//EntityCall::setGetEntityFunc(std::tr1::bind(&Dbmgr::tryGetEntityByEntityCall, this,
-	//	std::tr1::placeholders::_1, std::tr1::placeholders::_2));
+	// 初始化entitycall模块获取entity实体函数地址
+	EntityDef::setGetEntityFunc(std::tr1::bind(&Dbmgr::tryGetEntityByEntityCall, this,
+		std::tr1::placeholders::_1, std::tr1::placeholders::_2));
 
 	// 初始化entitycall模块获取channel函数地址
-	//EntityCall::setFindChannelFunc(std::tr1::bind(&Dbmgr::findChannelByEntityCall, this,
-	//	std::tr1::placeholders::_1));
 	EntityCall::setFindChannelFunc(std::tr1::bind(&Dbmgr::findChannelByEntityCall, this,
 		std::tr1::placeholders::_1));
 }
@@ -1086,7 +1084,6 @@ void Dbmgr::onBroadcastGlobalDataChanged(Network::Channel* pChannel, KBEngine::M
 					//const Network::Address *addr = &(entitycall->getChannel()->addr());
 					pyValue = static_cast<PyObject *>(new EntityCallCrossServer(g_centerID, entitycall));
 					value = script::Pickler::pickle(pyValue, 0);
-					delete pyValue;
 					Py_DECREF(pyValue);
 				}
 
