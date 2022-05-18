@@ -1,3 +1,9 @@
+# KBEngine for integrating centermgr
+
+这个分支加入对跨服玩法的原生功能支持，新增组件 centermgr
+整合来源于https://github.com/imgamer/kbengine
+
+--- 
 KBEngine
 ========
 
