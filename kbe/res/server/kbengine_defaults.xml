@@ -857,6 +857,9 @@
 	</machine>
 
 	<centermgr>
+		<!-- 是否启用跨服功能 -->
+		<enable>	false	</enable>
+
 		<!-- 指定接口地址，可配置网卡名、MAC、IP
 			（Interface address specified, configurable NIC/MAC/IP） 
 		-->
