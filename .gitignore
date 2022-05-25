@@ -19,6 +19,12 @@ logs/
 *.pdb
 *.chw
 
+# -------------[ vscode generated ]------------------------ #
+.vscode/
+
+# -------------[ svn generated ]------------------------ #
+.svn/
+
 # -------------[ OS generated ]------------------------ #
 .DS_Store
 .DS_Store?

@@ -288,6 +288,15 @@ public:
 	void executeRawDatabaseCommand(const char* datas, uint32 size, PyObject* pycallback, ENTITY_ID eid, const std::string& dbInterfaceName);
 	void onExecuteRawDatabaseCommandCB(KBEngine::MemoryStream& s);
 
+	// 收到远程调用转发请求 - lei
+	void remoteCalWithCallback(Network::Channel* pChannel, KBEngine::MemoryStream& s);
+	// 收到远程调用请求 - lei
+	void onRemoteCalWithCallback(Network::Channel* pChannel, KBEngine::MemoryStream& s);
+	// 收到远程调用回调转发请求 - lei
+	void remoteCalWithCallbackCB(Network::Channel* pChannel, KBEngine::MemoryStream& s);
+	// 收到远程调用回调请求 - lei
+	void onRemoteCalWithCallbackCB(Network::Channel* pChannel, KBEngine::MemoryStream& s);
+
 	PY_CALLBACKMGR& callbackMgr() { return pyCallbackMgr_; }
 
 protected:

@@ -272,6 +272,68 @@ namespace KBEngine
 		s.done();		
 	}
 
+	void Centermgr::remoteCalWithCallback(Network::Channel* pChannel, KBEngine::MemoryStream& s)
+	{
+		DEBUG_MSG("Centermgr::remoteCalWithCallback !\n");
+
+		COMPONENT_ORDER dstCenterID;
+		s >> dstCenterID;
+
+		const Centermgr::APP_INFO* dstApp = getAppInfo(dstCenterID);
+		if (dstApp == NULL)
+		{
+			COMPONENT_ID cid;
+			ENTITY_ID eid;
+			std::string method;
+			s >> cid >> eid >> method;
+			ERROR_MSG(fmt::format("Centermgr::remoteCalWithCallbackCB: cannot find centerID={}, cid={}, eid={}, method={}\n"
+				, dstCenterID, cid, eid, method));
+
+			// TODO: 跨服失败回调，使用者发起请需求需要得知结果以便下一步的行为，如果没有就不知道明确的失败时间点。可以不用，没有结果返回就是失败？
+		}
+		else
+		{
+			Network::Bundle* bundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
+			bundle->newMessage(DbmgrInterface::onRemoteCalWithCallback);
+			bundle->append(s);
+			dstApp->pChannel->send(bundle);
+		}
+
+		s.done();
+	}
+
+	void Centermgr::remoteCalWithCallbackCB(Network::Channel* pChannel, KBEngine::MemoryStream& s)
+	{
+		DEBUG_MSG("Centermgr::remoteCalWithCallbackCB !\n");
+
+		COMPONENT_ORDER dstCenterID;
+		s >> dstCenterID;
+
+		const Centermgr::APP_INFO* dstApp = getAppInfo(dstCenterID);
+		//ERROR_MSG(fmt::format("Centermgr::remoteCalWithCallbackCB: dstCenterID={}\n", dstCenterID));
+		if (dstApp == NULL)
+		{
+			COMPONENT_ORDER srcCenterID;
+			COMPONENT_ID cid;
+			COMPONENT_TYPE compType;
+			CALLBACK_ID callbackID;
+			s >> srcCenterID >> cid >> compType >> callbackID;
+			ERROR_MSG(fmt::format("Centermgr::remoteCalWithCallbackCB: cannot find centerID={}, cid={}, compType={}, callbackID={}\n"
+				, srcCenterID, cid, compType, callbackID));
+
+			// TODO: 跨服失败回调，使用者发起请需求需要得知结果以便下一步的行为，如果没有就不知道明确的失败时间点。可以不用，没有结果返回就是失败？
+		}
+		else
+		{
+			Network::Bundle* bundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
+			bundle->newMessage(DbmgrInterface::onRemoteCalWithCallbackCB);
+			bundle->append(s);
+			dstApp->pChannel->send(bundle);
+		}
+
+		s.done();
+	}
+
 	Centermgr::APP_INFOS const &Centermgr::getConnectedAppInfos()
 	{
 		return apps_;

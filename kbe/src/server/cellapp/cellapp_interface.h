@@ -169,6 +169,9 @@ NETWORK_INTERFACE_DECLARE_BEGIN(CellappInterface)
 	// 工具请求改变space查看器（含添加和删除功能）
 	CELLAPP_MESSAGE_DECLARE_STREAM(setSpaceViewer,									NETWORK_VARIABLE_MESSAGE)
 
+	// 收到远程调用回调请求
+	CELLAPP_MESSAGE_DECLARE_STREAM(onRemoteCalWithCallbackCB,						NETWORK_VARIABLE_MESSAGE)
+
 	//--------------------------------------------Entity----------------------------------------------------------
 	//远程呼叫entity方法
 	ENTITY_MESSAGE_DECLARE_STREAM(onRemoteMethodCall,								NETWORK_VARIABLE_MESSAGE)
@@ -200,6 +203,7 @@ NETWORK_INTERFACE_DECLARE_BEGIN(CellappInterface)
 
 	//entity丢失了一个观察者(客户端)
 	ENTITY_MESSAGE_DECLARE_ARGS0(onLoseWitness,										NETWORK_FIXED_MESSAGE)
+
 NETWORK_INTERFACE_DECLARE_END()
 
 #ifdef DEFINE_IN_INTERFACE

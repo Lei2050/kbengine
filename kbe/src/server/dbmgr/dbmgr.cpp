@@ -1503,6 +1503,118 @@ void Dbmgr::onExecuteRawDatabaseCommandCB(KBEngine::MemoryStream& s)
 }
 
 //-------------------------------------------------------------------------------------
+void Dbmgr::remoteCalWithCallback(Network::Channel* pChannel, KBEngine::MemoryStream& s)
+{
+	DEBUG_MSG("Dbmgr::remoteCalWithCallback !\n");
+	if (pChannel->isExternal()) { return; }
+
+	if (!centermgrInfo_)
+	{
+		ERROR_MSG("Dbmgr::remoteCalWithCallback: cannot find CenterMgr, may be it was disconnected.");
+		s.done();
+		return;
+	}
+
+	Network::Bundle* bundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
+	bundle->newMessage(CentermgrInterface::remoteCalWithCallback);
+	bundle->append(s);
+	centermgrInfo_->pChannel->send(bundle);
+	s.done();
+}
+
+//-------------------------------------------------------------------------------------
+void Dbmgr::onRemoteCalWithCallback(Network::Channel* pChannel, KBEngine::MemoryStream& s)
+{
+	DEBUG_MSG("Dbmgr::onRemoteCalWithCallback !\n");
+	if (!centermgrInfo_ || pChannel != centermgrInfo_->pChannel)
+	{
+		ERROR_MSG(fmt::format("Dbmgr::onRemoteCalWithCallback: from unknow centermgr:{}", pChannel->addr().c_str()));
+	}
+	else
+	{
+		COMPONENT_ID cid;
+		s >> cid;
+		DEBUG_MSG(fmt::format("Dbmgr::onRemoteCalWithCallback: component: {}", cid));
+
+		Components::ComponentInfos* cinfos = Components::getSingleton().findComponent(cid);
+		if (cinfos != NULL)
+		{
+			Network::Bundle* bundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
+			bundle->newMessage(BaseappInterface::onRemoteCalWithCallback);
+			bundle->append(s);
+			cinfos->pChannel->send(bundle);
+		}
+		else
+		{
+			ERROR_MSG(fmt::format("Dbmgr::onRemoteCalWithCallback: cannot find component: {}", cid));
+			// TODO: 跨服失败回调
+		}
+	}
+
+	s.done();
+}
+
+//-------------------------------------------------------------------------------------
+void Dbmgr::remoteCalWithCallbackCB(Network::Channel* pChannel, KBEngine::MemoryStream& s)
+{
+	DEBUG_MSG("Dbmgr::remoteCalWithCallbackCB !\n");
+	if (pChannel->isExternal()) { return; }
+
+	if (!centermgrInfo_)
+	{
+		ERROR_MSG("Dbmgr::remoteCalWithCallbackCB: cannot find CenterMgr, may be it was disconnected.");
+		s.done();
+		return;
+	}
+
+	Network::Bundle* bundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
+	bundle->newMessage(CentermgrInterface::remoteCalWithCallbackCB);
+	bundle->append(s);
+	centermgrInfo_->pChannel->send(bundle);
+	s.done();
+}
+
+//-------------------------------------------------------------------------------------
+void Dbmgr::onRemoteCalWithCallbackCB(Network::Channel* pChannel, KBEngine::MemoryStream& s)
+{
+	DEBUG_MSG("Dbmgr::onRemoteCalWithCallbackCB !\n");
+	if (!centermgrInfo_ || pChannel != centermgrInfo_->pChannel)
+	{
+		ERROR_MSG(fmt::format("Dbmgr::onRemoteCalWithCallbackCB: from unknow centermgr:{}", pChannel->addr().c_str()));
+	}
+	else
+	{
+		COMPONENT_ID cid;
+		COMPONENT_TYPE componentType;
+		s >> cid >> componentType;
+		DEBUG_MSG(fmt::format("Dbmgr::onRemoteCalWithCallback: component={}, componentType={}", cid, componentType));
+
+		Components::ComponentInfos* cinfos = Components::getSingleton().findComponent(cid);
+		if (cinfos != NULL)
+		{
+			Network::Bundle* bundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
+			if (COMPONENT_TYPE::CELLAPP_TYPE == componentType)
+			{
+				bundle->newMessage(CellappInterface::onRemoteCalWithCallbackCB);
+			}
+			else
+			{
+				bundle->newMessage(BaseappInterface::onRemoteCalWithCallbackCB);
+			}
+			bundle->append(s);
+			cinfos->pChannel->send(bundle);
+		}
+		else
+		{
+			ERROR_MSG(fmt::format("Dbmgr::onRemoteCalWithCallbackCB: cannot find component: {}", cid));
+			// TODO: 跨服失败回调
+		}
+	}
+
+	s.done();
+}
+
+//-------------------------------------------------------------------------------------
 void Dbmgr::writeEntity(Network::Channel* pChannel, 
 						KBEngine::MemoryStream& s)
 {

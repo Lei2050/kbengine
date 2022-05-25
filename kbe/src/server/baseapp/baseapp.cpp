@@ -29,6 +29,7 @@
 #include "math/math.h"
 #include "pyscript/py_memorystream.h"
 #include "client_lib/client_interface.h"
+#include "entitydef/entitycall_cross_server.h"
 
 #include "../../server/baseappmgr/baseappmgr_interface.h"
 #include "../../server/cellappmgr/cellappmgr_interface.h"
@@ -449,6 +450,7 @@ bool Baseapp::installPyModules()
 	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(),		lookUpEntityByDBID,				__py_lookUpEntityByDBID,									METH_VARARGS,			0);
 	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(), 		setAppFlags,					__py_setFlags,												METH_VARARGS,			0);
 	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(), 		getAppFlags,					__py_getFlags,												METH_VARARGS,			0);
+	APPEND_SCRIPT_MODULE_METHOD(getScript().getModule(),		remoteCalWithCallback,			__py_remoteCalWithCallback,									METH_VARARGS,			0);
 		
 	return EntityApp<Entity>::installPyModules();
 }
@@ -5951,6 +5953,392 @@ PyObject* Baseapp::__py_setFlags(PyObject* self, PyObject* args)
 
 	Baseapp::getSingleton().flags(flags);
 	S_Return;
+}
+
+//-------------------------------------------------------------------------------------
+PyObject* Baseapp::__py_remoteCalWithCallback(PyObject* self, PyObject* args)
+{
+	int argCount = (int)PyTuple_Size(args);
+	PyObject* pyRemoteEntityCall = NULL;
+	char* method = NULL;
+	PyObject* pyArg = NULL;
+	//PyObject* pyLocalEntityCall = NULL;
+	PyObject* pycallback = NULL;
+	int ret = 0;
+
+	if (argCount != 4)
+	{
+		PyErr_Format(PyExc_TypeError, "KBEngine::remoteCalWithCallback: argCount != 4 !");
+		PyErr_PrintEx(0);
+		S_Return;
+	}
+
+	ret = PyArg_ParseTuple(args, "O|s|O|O", &pyRemoteEntityCall, &method, &pyArg, &pycallback);
+	if (!ret)
+	{
+		PyErr_Format(PyExc_TypeError, "KBEngine::remoteCalWithCallback: args error!");
+		PyErr_PrintEx(0);
+		S_Return;
+	}
+
+	if (!PyObject_TypeCheck(pyArg, &PyTuple_Type))
+	{
+		PyErr_Format(PyExc_AssertionError, "KBEngine::remoteCalWithCallback: arg must be a tuple !\n");
+		PyErr_PrintEx(0);
+		S_Return;
+	}
+
+	Baseapp::getSingleton().remoteCalWithCallback(pyRemoteEntityCall, method, pyArg, pycallback);
+	S_Return;
+}
+
+//-------------------------------------------------------------------------------------
+void Baseapp::remoteCalWithCallback(PyObject* remoteEntityCall, const std::string& method, PyObject* pyArg,
+	PyObject* pycallback)
+{
+	if (PyObject_TypeCheck(remoteEntityCall, EntityCallCrossServer::getScriptType()))
+	{
+		EntityCallCrossServer* acrossEntityCall = static_cast<EntityCallCrossServer*>(remoteEntityCall);
+		if (acrossEntityCall->centerID() == g_centerID)
+		{
+			//本服
+			//remoteCalWithCallbackLocally(remoteEntityCall, method, pyArg, pycallback);
+			ERROR_MSG("Baseapp::remoteCalWithCallback remoteCrossEntity is in local server.\n");
+			return;
+		}
+		else
+		{
+			//跨服
+			remoteCalWithCallbackCrossServer(acrossEntityCall, method, pyArg, pycallback);
+		}
+	}
+	else if (PyObject_TypeCheck(remoteEntityCall, EntityCall::getScriptType()))
+	{
+		EntityCall* pEntityCall = static_cast<EntityCall*>(remoteEntityCall);
+		if (pEntityCall->componentID() == g_componentID)
+		{
+			//本地Component
+			Entity * pEntity = pEntities_->find(pEntityCall->id());
+			if (pEntity == NULL)
+			{
+				ERROR_MSG(fmt::format("Baseapp::remoteCalWithCallback: not find entity={}.\n", pEntityCall->id()));
+				return;
+			}
+			remoteCalWithCallbackLocally(pEntity, method, pyArg, pycallback);
+		}
+		else
+		{
+			//本服
+			remoteCalWithCallbackLocalServer(pEntityCall, method, pyArg, pycallback);
+		}
+	}
+	else if (PyObject_TypeCheck(remoteEntityCall, Entity::getScriptType()))
+	{
+		Entity* pEntity = static_cast<Entity*>(remoteEntityCall);
+		remoteCalWithCallbackLocally(pEntity, method, pyArg, pycallback);
+	}
+	else
+	{
+		ERROR_MSG("Cellapp::remoteCalWithCallback: error type.\n");
+		return;
+	}
+}
+
+//-------------------------------------------------------------------------------------
+void Baseapp::onRemoteCalWithCallback(Network::Channel* pChannel, KBEngine::MemoryStream& s)
+{
+	DEBUG_MSG("Baseapp::onRemoteCalWithCallback\n");
+	if (pChannel->isExternal())
+		return;
+
+	ENTITY_ID entityid;
+	std::string method;
+	std::string datas;
+	COMPONENT_ID srcCid;
+	COMPONENT_TYPE srcComponentType;
+	COMPONENT_ORDER srcCenterID;
+	CALLBACK_ID srcCallbackID = 0;
+	s >> entityid >> method;
+	s.readBlob(datas);
+	s >> srcCid >> srcComponentType >> srcCenterID >> srcCallbackID;
+	//ERROR_MSG(fmt::format("    >>> entityid={}, method={}, srcCid={}, srcComponentType={}, "
+	//	"srcCenterID={}, srcCallbackID={}.\n"
+	//	, entityid, method, srcCid, srcComponentType, srcCenterID, srcCallbackID));
+
+	Entity* pEntity = pEntities_->find(entityid);
+	if (!pEntity)
+	{
+		ERROR_MSG(fmt::format("Baseapp::onRemoteCalWithCallback: not find entity={}.\n", entityid));
+		return;
+	}
+
+	PyObject* pArgDict = script::Pickler::unpickle(datas);
+	if (pArgDict == NULL)
+	{
+		ERROR_MSG("Baseapp::onRemoteCalWithCallback: pArgDict unpickle failed !\n");
+		return;
+	}
+
+	PyObject* pyFunc = PyObject_GetAttrString(pEntity, const_cast<char*>(method.c_str()));
+	if (!pyFunc)
+	{
+		ERROR_MSG(fmt::format("Baseapp::onRemoteCalWithCallback: not find method={}.\n", method));
+		return;
+	}
+	Py_XDECREF(pyFunc);
+
+	PyObject* pyResult = PyObject_CallMethod(pEntity, method.c_str(), const_cast<char*>("O"), pArgDict);
+	if (pyResult == NULL) {
+		ERROR_MSG("Baseapp::onRemoteCalWithCallback: call method={} failed !\n", method);
+		PyErr_PrintEx(0);
+		Py_DECREF(pArgDict);
+		return;
+	}
+	Py_DECREF(pArgDict);
+
+	if (srcCallbackID > 0)
+	{
+		if (srcCenterID == g_centerID)
+		{
+			//本服
+			Components::ComponentInfos* compinfos = Components::getSingleton().findComponent(srcCid);
+			if (compinfos == NULL || compinfos->pChannel == NULL || compinfos->cid == 0)
+			{
+				ERROR_MSG("Baseapp::onRemoteCalWithCallback: not found compinfos !\n");
+				if (pyResult != NULL) {
+					Py_DECREF(pyResult);
+				}
+				return;
+			}
+
+			Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
+			if (COMPONENT_TYPE::CELLAPP_TYPE == srcComponentType)
+			{
+				(*pBundle).newMessage(CellappInterface::onRemoteCalWithCallbackCB);
+			}
+			else
+			{
+				(*pBundle).newMessage(BaseappInterface::onRemoteCalWithCallbackCB);
+			}
+			(*pBundle) << srcCallbackID;
+			std::string datas = pyResult != NULL ? script::Pickler::pickle(pyResult) : "";
+			pBundle->appendBlob(datas);
+
+			compinfos->pChannel->send(pBundle);
+		}
+		else
+		{
+			Components::ComponentInfos* dbmgrinfos = Components::getSingleton().getDbmgr();
+			if (dbmgrinfos == NULL || dbmgrinfos->pChannel == NULL || dbmgrinfos->cid == 0)
+			{
+				ERROR_MSG("Baseapp::onRemoteCalWithCallback: not found dbmgr !\n");
+				if (pyResult != NULL) {
+					Py_DECREF(pyResult);
+				}
+				return;
+			}
+
+			Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
+			(*pBundle).newMessage(DbmgrInterface::remoteCalWithCallbackCB);
+			(*pBundle) << srcCenterID << srcCid << srcComponentType << srcCallbackID;
+			std::string datas = pyResult != NULL ? script::Pickler::pickle(pyResult) : "";
+			pBundle->appendBlob(datas);
+
+			dbmgrinfos->pChannel->send(pBundle);
+		}
+
+	}
+	if (pyResult != NULL) {
+		Py_DECREF(pyResult);
+	}
+
+	SCRIPT_ERROR_CHECK();
+}
+
+//-------------------------------------------------------------------------------------
+void Baseapp::onRemoteCalWithCallbackCB(Network::Channel* pChannel, KBEngine::MemoryStream& s)
+{
+	DEBUG_MSG("Baseapp::onRemoteCalWithCallbackCB\n");
+	if (pChannel->isExternal())
+		return;
+
+	CALLBACK_ID callbackID = 0;
+	std::string datas;
+	s >> callbackID;
+	s.readBlob(datas);
+	//ERROR_MSG(fmt::format("    >>> callbackID={}.\n", callbackID));
+
+	PyObject* pResult = script::Pickler::unpickle(datas);
+	if (pResult == NULL)
+	{
+		ERROR_MSG("Baseapp::onRemoteCalWithCallbackCB: pResult unpickle failed !\n");
+		return;
+	}
+
+	ERROR_MSG("onRemoteCalWithCallbackCB 11\n");
+	PyObjectPtr pyCallback = callbackMgr().take(callbackID);
+	ERROR_MSG("onRemoteCalWithCallbackCB 22\n");
+	if (pyCallback == NULL)
+	{
+		ERROR_MSG(fmt::format("Baseapp::onRemoteCalWithCallbackCB: not found callback:{}.\n",
+			callbackID));
+		Py_DECREF(pResult);
+		return;
+	}
+
+	PyObject* pyRet = NULL;
+	if (PyObject_TypeCheck(pResult, &PyTuple_Type))
+	{
+		pyRet = PyObject_CallObject(pyCallback.get(), pResult);
+		Py_DECREF(pResult);
+	}
+	else {
+		PyObject* args = PyTuple_New(1);
+		PyTuple_SET_ITEM(args, 0, pResult);
+		pyRet = PyObject_CallObject(pyCallback.get(), args);
+		Py_DECREF(args);
+	}
+
+	if (pyRet != NULL)
+	{
+		Py_DECREF(pyRet);
+	}
+
+	SCRIPT_ERROR_CHECK();
+}
+
+//-------------------------------------------------------------------------------------
+void Baseapp::remoteCalWithCallbackLocally(Entity* pEntity, const std::string& method, PyObject* pyArg, PyObject* pycallback)
+{
+	DEBUG_MSG("Baseapp::remoteCalWithCallbackLocally !\n");
+
+	ScriptDefModule* pScriptModule = pEntity->pScriptModule();
+	if (pScriptModule == NULL)
+	{
+		ERROR_MSG("KBEngine::remoteCalWithCallback: pScriptModule == NULL.");
+		return;
+	}
+
+	MethodDescription* pMethodDescription = pScriptModule->findBaseMethodDescription(method.c_str());
+	if (pMethodDescription == NULL)
+	{
+		ERROR_MSG(fmt::format("KBEngine::remoteCalWithCallbackLocally: can't found method={}.\n", method));
+		return;
+	}
+
+	PyObject* pyResult = PyObject_CallMethod(pEntity, method.c_str(), const_cast<char*>("O"), pyArg);
+	if (pyResult == NULL) {
+		ERROR_MSG("Baseapp::onRemoteCalWithCallback: call method={} failed !\n", method);
+		PyErr_PrintEx(0);
+		return;
+	}
+
+	PyObject* pyRet = PyObject_CallObject(pycallback, pyResult);
+	Py_DECREF(pyResult);
+	if (pyRet != NULL)
+	{
+		Py_DECREF(pyRet);
+	}
+
+	SCRIPT_ERROR_CHECK();
+}
+
+//-------------------------------------------------------------------------------------
+void Baseapp::remoteCalWithCallbackLocalServer(EntityCall* pEntityCall
+	, const std::string& method, PyObject* pyArg, PyObject* pycallback)
+{
+	DEBUG_MSG("Baseapp::remoteCalWithCallbackLocalServer !\n");
+
+	ScriptDefModule* pScriptModule = pEntityCall->pScriptModule();
+	if (pScriptModule == NULL)
+	{
+		ERROR_MSG("KBEngine::remoteCalWithCallback: pScriptModule == NULL.");
+		return;
+	}
+
+	MethodDescription* pMethodDescription = pScriptModule->findBaseMethodDescription(method.c_str());
+	//ERROR_MSG(fmt::format("KBEngine::remoteCalWithCallback: method={}.\n", method));
+	if (pMethodDescription == NULL)
+	{
+		ERROR_MSG(fmt::format("KBEngine::remoteCalWithCallback: can't found method={}.\n", method));
+		return;
+	}
+
+	//目前只允许远程调用base中entity的方法
+	Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
+	(*pBundle).newMessage(BaseappInterface::onRemoteCalWithCallback);
+	(*pBundle) << pEntityCall->id();
+	(*pBundle) << method;
+	std::string datas = script::Pickler::pickle(pyArg);
+	pBundle->appendBlob(datas);
+	(*pBundle) << componentID() << COMPONENT_TYPE::BASEAPP_TYPE << g_centerID;
+
+	CALLBACK_ID callbackID = 0;
+	if (pycallback && PyCallable_Check(pycallback))
+	{
+		callbackID = callbackMgr().save(pycallback);
+	}
+	(*pBundle) << callbackID;
+
+	//Components::ComponentInfos* dbmgrinfos = Components::getSingleton().getDbmgr();
+	Components::ComponentInfos* baseappinfos = Components::getSingleton().findComponent(pEntityCall->componentID());
+	if (baseappinfos == NULL || baseappinfos->pChannel == NULL || baseappinfos->cid == 0)
+	{
+		return;
+	}
+
+	baseappinfos->pChannel->send(pBundle);
+}
+
+//-------------------------------------------------------------------------------------
+void Baseapp::remoteCalWithCallbackCrossServer(EntityCallCrossServer* pAcrossEntityCall
+	, const std::string& method, PyObject* pyArg, PyObject* pycallback)
+{
+	DEBUG_MSG("Baseapp::remoteCalWithCallbackCrossServer !\n");
+
+	ScriptDefModule* pScriptModule = pAcrossEntityCall->pScriptModule();
+	if (pScriptModule == NULL)
+	{
+		ERROR_MSG("KBEngine::remoteCalWithCallback: pScriptModule == NULL.");
+		return;
+	}
+
+	MethodDescription* pMethodDescription = pScriptModule->findBaseMethodDescription(method.c_str());
+	//ERROR_MSG(fmt::format("KBEngine::remoteCalWithCallback: method={}.\n", method));
+	if (pMethodDescription == NULL)
+	{
+		ERROR_MSG(fmt::format("KBEngine::remoteCalWithCallback: can't found method={}.\n", method));
+		return;
+	}
+
+	//目前只允许远程调用base中entity的方法
+	Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
+	(*pBundle).newMessage(DbmgrInterface::remoteCalWithCallback);
+	//(*pBundle) << acrossEntityCall->centerID();
+	(*pBundle) << COMPONENT_ORDER(1);
+	//(*pBundle) << acrossEntityCall->componentID();
+	(*pBundle) << COMPONENT_ID(7001);
+	(*pBundle) << pAcrossEntityCall->id();
+	(*pBundle) << method;
+	std::string datas = script::Pickler::pickle(pyArg);
+	pBundle->appendBlob(datas);
+	(*pBundle) << componentID() << COMPONENT_TYPE::BASEAPP_TYPE << g_centerID;
+
+	CALLBACK_ID callbackID = 0;
+	if (pycallback && PyCallable_Check(pycallback))
+	{
+		callbackID = callbackMgr().save(pycallback);
+	}
+	(*pBundle) << callbackID;
+
+	Components::ComponentInfos* dbmgrinfos = Components::getSingleton().getDbmgr();
+	if (dbmgrinfos == NULL || dbmgrinfos->pChannel == NULL || dbmgrinfos->cid == 0)
+	{
+		ERROR_MSG("KBEngine::executeRawDatabaseCommand: not found dbmgr!\n");
+		return;
+	}
+
+	dbmgrinfos->pChannel->send(pBundle);
 }
 
 //-------------------------------------------------------------------------------------

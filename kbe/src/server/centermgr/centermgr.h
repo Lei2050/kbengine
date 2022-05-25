@@ -80,6 +80,16 @@ public:
 	*/
 	void requestAcrossServerSuccess(Network::Channel *pChannel, KBEngine::MemoryStream& s);
 
+	/* 网络接口
+	* 远程调用请求
+	*/
+	void remoteCalWithCallback(Network::Channel* pChannel, KBEngine::MemoryStream& s);
+
+	/* 网络接口
+	* 远程调用回调请求
+	*/
+	void remoteCalWithCallbackCB(Network::Channel* pChannel, KBEngine::MemoryStream& s);
+
 private:
 	APP_INFOS apps_;
 

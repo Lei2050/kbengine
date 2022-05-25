@@ -320,6 +320,12 @@ NETWORK_INTERFACE_DECLARE_BEGIN(BaseappInterface)
 	// 请求强制杀死当前app
 	BASEAPP_MESSAGE_DECLARE_STREAM(reqKillServer,									NETWORK_VARIABLE_MESSAGE)
 
+	// 收到远程调用请求
+	BASEAPP_MESSAGE_DECLARE_STREAM(onRemoteCalWithCallback,							NETWORK_VARIABLE_MESSAGE)
+
+	// 收到远程调用回调请求
+	BASEAPP_MESSAGE_DECLARE_STREAM(onRemoteCalWithCallbackCB,						NETWORK_VARIABLE_MESSAGE)
+
 	//--------------------------------------------Entity----------------------------------------------------------
 	// 远程呼叫entity方法
 	ENTITY_MESSAGE_EXPOSED(onRemoteMethodCall)
@@ -350,7 +356,7 @@ NETWORK_INTERFACE_DECLARE_BEGIN(BaseappInterface)
 	ENTITY_MESSAGE_DECLARE_ARGS2(onMigrationCellappEnd,								NETWORK_FIXED_MESSAGE,
 								COMPONENT_ID,										sourceCellAppID,
 								COMPONENT_ID,										targetCellAppID)
-
+	
 	//--------------------------------------------Proxy---------------------------------------------------------
 	/**
 		远程呼叫entity方法

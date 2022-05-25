@@ -12,6 +12,7 @@
 #include "server/pendingLoginmgr.h"
 #include "server/forward_messagebuffer.h"
 #include "network/endpoint.h"
+#include "entitydef/entitycall_cross_server.h"
 
 //#define NDEBUG
 // windows include	
@@ -533,6 +534,23 @@ public:
 	void flags(uint32 v) { flags_ = v; }
 	static PyObject* __py_setFlags(PyObject* self, PyObject* args);
 	static PyObject* __py_getFlags(PyObject* self, PyObject* args);
+
+	/**
+		带回调的远程调用
+	*/
+	static PyObject* __py_remoteCalWithCallback(PyObject* self, PyObject* args);
+	void remoteCalWithCallback(PyObject* remoteEntityCall, const std::string& method, PyObject* argDict, PyObject* pycallback);
+	void onRemoteCalWithCallback(Network::Channel* pChannel, KBEngine::MemoryStream& s);
+	void onRemoteCalWithCallbackCB(Network::Channel* pChannel, KBEngine::MemoryStream& s);
+
+private:
+	//调用本地的entity
+	void remoteCalWithCallbackLocally(Entity* pEntity, const std::string& method, PyObject* pyArg, PyObject* pycallback);
+	//调用本服的entityCall，不走跨服
+	void remoteCalWithCallbackLocalServer(EntityCall* pEntityCall, const std::string& method, PyObject* pyArg, PyObject* pycallback);
+	//调用跨服的crossEntityCall，跨服
+	void remoteCalWithCallbackCrossServer(EntityCallCrossServer* pAcrossEntityCall
+		, const std::string& method, PyObject* pyArg, PyObject* pycallback);
 	
 protected:
 	TimerHandle												loopCheckTimerHandle_;
